@@ -12,10 +12,8 @@ class D435Process:
         config_d435.enable_device('923322071945')
         config_d435.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         config_d435.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        pipeline_d435.start(config_d435)
+        profile_d435 = pipeline_d435.start(config_d435)
 
-        # config_t265 = rs.config()
-        # config_t265.enable_device('944222110230')
 
         try:
             while True:
@@ -43,4 +41,5 @@ class D435Process:
                 cv2.imshow('RealSense', images)
                 cv2.waitKey(1)
         finally:
+            print('stop')
             pipeline_d435.stop()
