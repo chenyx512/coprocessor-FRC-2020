@@ -9,7 +9,7 @@ class T265Process:
         pipeline_t265 = rs.pipeline()
         config_t265 = rs.config()
         config_t265.enable_stream(rs.stream.pose)
-        config_t265.enable_device('944222110230')
+        # config_t265.enable_device('944222110230')
         profile_t265 = pipeline_t265.start(config_t265)
 
         try:
