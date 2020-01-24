@@ -55,25 +55,26 @@ class D435Process:
                 depth_image = np.asanyarray(depth_frame.get_data())
                 color_image = np.asanyarray(color_frame.get_data())
 
-                depth_image = cv2.blur(depth_image, (5, 5))
+                # depth_image = cv2.blur(depth_image, (5, 5))
                 # depth_image = cv2.bilateralFilter(depth_image, 7, 50, 50)
-                sobelx = cv2.Sobel(depth_image, cv2.CV_16SC1, 1, 0, ksize=5)
-                sobely = cv2.Sobel(depth_image, cv2.CV_16SC1, 0, 1, ksize=5)
-                edges = cv2.Canny(sobelx, sobely, 2500, 5500)
+                # sobelx = cv2.Sobel(depth_image, cv2.CV_16SC1, 1, 0, ksize=5)
+                # sobely = cv2.Sobel(depth_image, cv2.CV_16SC1, 0, 1, ksize=5)
+                # edges = cv2.Canny(sobelx, sobely, 4000, 6000)
 
-                # depth_uint8 = np.maximum(255, depth_image.copy()/5).astype(np.uint8)
-                # depth_uint8 = cv2.bilateralFilter(depth_uint8, 7, 50, 50)
-                # edges = cv2.Canny(depth_uint8, 400, 1100)
+                depth_uint8 = np.maximum(255, depth_image.copy()/5).astype(np.uint8)
+                depth_uint8 = cv2.bilateralFilter(depth_uint8, 7, 50, 50)
+                depth_uint8 = cv2.bilateralFilter(depth_uint8, 7, 50, 50)
+                edges = cv2.Canny(depth_uint8, 800, 1200)
 
-                edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((5,5),np.uint8))
+                # edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((5,5),np.uint8))
                 contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 contours = [cnt for cnt in contours if self.check(cnt)]
 
                 cv2.drawContours(color_image, contours, 0, (0,255,0), 3)
                 
                 edges = np.stack([edges, edges, edges], axis=-1)
-                # edges = np.where(edges==255, edges, color_image)
-                self.show(color_image)
+                edges = np.where(edges==255, edges, color_image)
+                self.show(edges)
 
                 # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
                 # depth_image = cv2.applyColorMap(
