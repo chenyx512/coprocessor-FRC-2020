@@ -1,6 +1,12 @@
 import numpy as np
 
 class Constants:
+    # Camera calibration for microsoft cam
+    CAMERA_MATRIX = [[705.09765532,  0.,           316.48307281],
+                    [0.,            705.62034134, 223.3216818],
+                    [0.,            0.,           1.]]
+    DISTORTION_COEF = [0.1226279, -0.43199166,  0.00196861, -0.00344178, -1.21531281]
+
     # CV - HSV
     H_MIN = 90
     H_MAX = 100

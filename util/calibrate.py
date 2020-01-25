@@ -20,7 +20,15 @@ import numpy as np
 import cv2 as cv
 
 # local modules
-from common import splitfn
+# from common import splitfn
+def splitfn(file_path):
+
+    file_path_parts = file_path.split(sep=os.sep)
+    _path = os.path.join(*file_path_parts[:-1])
+    file_name = file_path_parts[-1]
+    file_name_parts = file_name.split(sep='.')
+    return _path, file_name_parts[0], file_name_parts[1]
+
 
 # built-in modules
 import os

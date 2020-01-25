@@ -1,5 +1,6 @@
 import cv2
 import argparse
+import numpy as np
 
 if __name__ == "__main__":
 
@@ -23,8 +24,10 @@ if __name__ == "__main__":
     auto_mode = eval(args["auto_mode"])
 
     cap = cv2.VideoCapture(deviceID)
+    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+    cap.set(cv2.CAP_PROP_EXPOSURE, -7)
     if not cap.isOpened():
-        print "Error openning camera:", deviceID
+        print("Error openning camera:", deviceID)
         exit(0)
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -59,7 +62,12 @@ if __name__ == "__main__":
             # Display the resulting frame
             cv2.imshow('frameCopy', frameCopy)
         else:
-            cv2.imshow('frame', frame)
+            pattern_size = (9, 6)
+            frame_copy = frame.copy()
+            found, corners = cv2.findChessboardCorners(frame_copy, pattern_size)
+            if found:
+                cv2.drawChessboardCorners(frame_copy, pattern_size, corners, found)
+            cv2.imshow('frame', frame_copy)
 
         key = cv2.waitKey(1) & 0xFF
         if 27 == key:#Esc
@@ -68,6 +76,7 @@ if __name__ == "__main__":
             if not cv2.imwrite(pathToImagesFolder+"%d"%numberOfImages+".jpg", frame):
                 print("Error written images to:", pathToImagesFolder+"%d"%numberOfImages+".jpg")
             numberOfImages -= 1
+            print('good image')
 
         it += 1
         if 0==numberOfImages:
