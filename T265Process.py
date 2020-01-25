@@ -7,6 +7,7 @@ class T265Process:
     def __init__(self, xyz_rpy_queue, encoder_v_queue):
         self.xyz_rpy_queue = xyz_rpy_queue
         self.encoder_v_queue = encoder_v_queue
+        self.logger = logging.getLogger(__name__)
 
     def run(self):
         pipeline_t265 = rs.pipeline()
@@ -35,7 +36,7 @@ class T265Process:
                 try:
                     self.xyz_rpy_queue.put_nowait((pose.timestamp, data))
                 except Full:
-                    logging.warning('xyz_rpy_queue full')
+                    self.logger.warning('xyz_rpy_queue full')
         finally:
             print("stop")
             pipeline_t265.stop()

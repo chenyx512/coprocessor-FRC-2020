@@ -7,6 +7,7 @@ import numpy as np
 class CVProcess:
     def __init__(self, target_queue):
         self.target_queue = target_queue
+        self.logger = self.logger.getLogger(__name__)
 
     def show(self, img):
         cv2.imshow('img', img)
@@ -31,14 +32,14 @@ class CVProcess:
             if len(contours) > 0:
                 contour =    max(contours, key=cv2.contourArea)
             else:
-                logging.debug("NO TARGET")
+                self.logger.debug("NO TARGET")
                 continue
             if cv2.contourArea(contour) < Constants.MIN_TARGET_AREA:
-                logging.debug(f'target area {cv2.contourArea(contour)}'
+                self.logger.debug(f'target area {cv2.contourArea(contour)}'
                               f'<{Constants.MIN_TARGET_AREA}, ignore')
                 continue
             if len(contour) < 4:
-                logging.debug('target contour less than 4 points, ignore')
+                self.logger.debug('target contour less than 4 points, ignore')
                 continue
 
             extreme_points = [] # TL, BL, BR, TR
@@ -46,6 +47,11 @@ class CVProcess:
                 # TODO debug
                 extreme_points.append(np.dot(Constants.EXTREME_VECTOR, contour).argmax())
                 cv2.circle(frame, contour[extreme_points[-1]], 4, (0, 0, 255), -1)
-
+            ret, rvec, tvec = cv2.solvePnP(Constants.TARGET_3D, extreme_points,
+                                           Constants.CAMERA_MATRIX, Constants.DISTORTION_COEF)
+            if ret:
+                self.logger.debug(f'matched target rvec{rvec} tvec{tvec}')
+            else:
+                self.logger.debug('target not matched')
             self.show(frame)
 

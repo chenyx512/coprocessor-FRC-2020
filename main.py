@@ -1,13 +1,27 @@
 import logging
+import logging.config
 import multiprocessing as mp
 import time
+from datetime import datetime
 from networktables import NetworkTables
 from queue import Full, Empty
+import yaml
 
 from D435Process import D435Process
 from T265Process import T265Process
 from CVProcess import CVProcess
 from Constants import Constants
+
+
+# logging setup
+with open('logging_config.yaml', 'r') as yaml_file:
+    logging_config = yaml.safe_load(yaml_file)
+for _, handler in logging_config['handlers'].items():
+    if 'filename' in handler:
+        timestamp = datetime.now().strftime(r'%m%d_%H%M%S')
+        handler['filename'] = str(f'log/{timestamp}.log')
+logging.config.dictConfig(logging_config)
+
 
 # shared
 encoder_v_queue = mp.Queue(1)
