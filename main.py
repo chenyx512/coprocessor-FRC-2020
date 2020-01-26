@@ -7,7 +7,6 @@ from networktables import NetworkTables
 from queue import Full, Empty
 import yaml
 
-from D435Process import D435Process
 from T265Process import T265Process
 from CVProcess import CVProcess
 from Constants import Constants
@@ -46,7 +45,7 @@ NetworkTables.getEntry('/odom/encoder_v').addListener(
     NetworkTables.NotifyFlags.UPDATE
 )
 
-# # status flag
+# status flag
 is_master_connected = False
 last_master_connect_time = 0.0
 is_t265_connected = False
@@ -54,12 +53,13 @@ last_t265_connect_time = 0.0
 is_CV_connected = False
 last_CV_connect_time = 0.0
 slave_handshake_cnt = 0
-#
-# # processes
-t265_process = T265Process(xyz_rpy_queue, xyz_rpy_value, encoder_v_queue)
-mp.Process(target=t265_process.run).start()
+
+# processes
+# t265_process = T265Process(xyz_rpy_queue, xyz_rpy_value, encoder_v_queue)
+# mp.Process(target=t265_process.run).start()
 cv_process = CVProcess(target_queue, xyz_rpy_value)
-mp.Process(target=cv_process.run).start()
+cv_process.run()
+# mp.Process(target=cv_process.run).start()
 
 while True:
     # get pose
@@ -69,7 +69,7 @@ while True:
         last_t265_connect_time = connect_time
         is_t265_connected = True
     except Empty:
-        if last_t265_connect_time - time.time() > Constants.DISCONNECT_TIME:
+        if time.time() - last_t265_connect_time > Constants.DISCONNECT_TIME:
             is_t265_connected = False
     odom_table.putBoolean('is_t265_connected', is_t265_connected)
 
@@ -81,10 +81,11 @@ while True:
         last_CV_connect_time = connect_time
         is_CV_connected = True
     except Empty:
-        if last_CV_connect_time - time.time() > Constants.DISCONNECT_TIME:
+        if time.time() - last_CV_connect_time > Constants.DISCONNECT_TIME:
             is_CV_connected = False
     odom_table.putBoolean('is_CV_connected', is_CV_connected)
 
     # handshake
     odom_table.putNumber('slave_time', time.time())
+    NetworkTables.flush()
     time.sleep(0.01)
