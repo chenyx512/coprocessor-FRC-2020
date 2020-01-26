@@ -26,6 +26,7 @@ logging.config.dictConfig(logging_config)
 # shared
 encoder_v_queue = mp.Queue(1)
 xyz_rpy_queue = mp.Queue(1)
+xyz_rpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
 
 def encoder_callback(entry, key, value, is_new):
@@ -34,6 +35,7 @@ def encoder_callback(entry, key, value, is_new):
             encoder_v_queue.put_nowait(value)
         except Full:
             logging.warning('encoder_v queue full')
+
 # NTable
 ip = 'roborio-3566-frc.local'
 logging.info(f'starting NTable with ip [{ip}]')
@@ -44,7 +46,7 @@ NetworkTables.getEntry('/odom/encoder_v').addListener(
     NetworkTables.NotifyFlags.UPDATE
 )
 
-# status flag
+# # status flag
 is_master_connected = False
 last_master_connect_time = 0.0
 is_t265_connected = False
@@ -52,11 +54,11 @@ last_t265_connect_time = 0.0
 is_CV_connected = False
 last_CV_connect_time = 0.0
 slave_handshake_cnt = 0
-
-# processes
-t265_process = T265Process(xyz_rpy_queue, encoder_v_queue)
+#
+# # processes
+t265_process = T265Process(xyz_rpy_queue, xyz_rpy_value, encoder_v_queue)
 mp.Process(target=t265_process.run).start()
-cv_process = CVProcess(target_queue)
+cv_process = CVProcess(target_queue, xyz_rpy_value)
 mp.Process(target=cv_process.run).start()
 
 while True:

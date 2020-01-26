@@ -4,8 +4,9 @@ from queue import Full, Empty
 import logging
 
 class T265Process:
-    def __init__(self, xyz_rpy_queue, encoder_v_queue):
+    def __init__(self, xyz_rpy_queue, xyz_rpy_value, encoder_v_queue):
         self.xyz_rpy_queue = xyz_rpy_queue
+        self.xyz_rpy_value = xyz_rpy_value
         self.encoder_v_queue = encoder_v_queue
         self.logger = logging.getLogger(__name__)
 
@@ -31,12 +32,15 @@ class T265Process:
                 roll = m.atan2(2.0 * (w * x + y * z), w * w - x * x - y * y + z * z) * 180.0 / m.pi;
                 yaw = m.atan2(2.0 * (w * z + x * y), w * w + x * x - y * y - z * z) * 180.0 / m.pi;
 
-                data = (data.translation.x, data.translation.y, data.translation.z,
-                        yaw, pitch, roll)
+                xyz_rpy = (-data.translation.z, -data.translation.x, data.translation.y,
+                           roll, pitch, yaw)
+                # self.logger.debug(f'xyz_ypr: {xyz_rpy}')
+                self.xyz_rpy_value[0:6] = xyz_rpy
                 try:
-                    self.xyz_rpy_queue.put_nowait((pose.timestamp, data))
+                    self.xyz_rpy_queue.put_nowait((xyz_rpy))
                 except Full:
-                    self.logger.warning('xyz_rpy_queue full')
+                    pass
+                    # self.logger.warning('xyz_rpy_queue full')
         finally:
             print("stop")
             pipeline_t265.stop()
