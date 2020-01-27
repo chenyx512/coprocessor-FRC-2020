@@ -3,18 +3,20 @@ import logging
 import numpy as np
 import math
 from queue import Full, Empty
+import multiprocessing as mp
 
 from Constants import Constants
 
 
-class CVProcess:
+class CVProcess(mp.Process):
     def __init__(self, target_queue, xyzrpy_value):
+        super().__init__()
         self.target_queue = target_queue
         self.xyz_rpy_value = xyzrpy_value
         self.logger = logging.getLogger(__name__)
 
-    def run(self):
-        cap = cv2.VideoCapture(0) # change when debugging on local
+    def process_method(self):
+        cap = cv2.VideoCapture(3) # change when debugging on local
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, Constants.EXPOSURE_AUTO)
         cap.set(cv2.CAP_PROP_EXPOSURE, Constants.EXPOSURE_ABS)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, Constants.HEIGHT)
@@ -48,7 +50,7 @@ class CVProcess:
                         break
                     good_contour = approx
             if good_contour is None:
-                self.logger.debug('no good contour')
+                # self.logger.debug('no good contour')
                 if Constants.DEBUG:
                     cv2.imshow('target', frame)
                     cv2.waitKey(1)
@@ -99,9 +101,9 @@ class CVProcess:
             except Full:
                 self.logger.warning('target_queue full')
 
-    def start(self):
+    def run(self):
         try:
-            self.run()
+            self.process_method()
         except Exception:
             self.logger.exception("exception uncaught in process_method, "
                                   "wait for root process to restart this")

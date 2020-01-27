@@ -36,6 +36,8 @@ class Constants:
     DISCONNECT_DURATION = 1.0 # sec
     RESTART_DURATION = 5.0 # sec
 
-    DEBUG = True
+    DEBUG = False
+    MA_MOMENTUM = 0.9
+    UPDATE_PERIOD = 3 # sec
 
 # 100, 400; 100 100

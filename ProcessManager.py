@@ -27,11 +27,16 @@ class ProcessManager:
 
 
         self.last_connect_time = time.time()
+        self.update_rate = 0
         self.is_connected = False
+        self.last_update_time = time.time()
 
 
     def update(self):
         if self.update_fn():
+            rate = 1 / (time.time() - self.last_connect_time)
+            self.update_rate = self.update_rate * Constants.MA_MOMENTUM + \
+                               rate * (1 - Constants.MA_MOMENTUM)
             self.last_connect_time = time.time()
             self.is_connected = True
         else:
@@ -47,3 +52,7 @@ class ProcessManager:
                 self.process = self.new_process_fn()
                 self.process.start()
                 self.last_connect_time = time.time()
+
+        if time.time() - self.last_update_time > Constants.UPDATE_PERIOD:
+            self.logger.info(f"update rate {self.update_rate:4.1f}hz")
+            self.last_update_time = time.time()

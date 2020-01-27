@@ -4,6 +4,7 @@ from queue import Full, Empty
 import multiprocessing as mp
 import logging
 
+
 class T265Process(mp.Process):
     def __init__(self, xyz_rpy_queue, xyz_rpy_value, encoder_v_queue):
         super().__init__()
