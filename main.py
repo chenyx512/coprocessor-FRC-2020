@@ -24,7 +24,7 @@ logging.config.dictConfig(logging_config)
 
 # shared
 encoder_v_queue = mp.Queue(1)
-xyz_rpy_queue = mp.Queue(1)
+xyz_rpy_queue = mp.Queue(10)
 xyz_rpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
 
@@ -55,37 +55,47 @@ last_CV_connect_time = 0.0
 slave_handshake_cnt = 0
 
 # processes
-# t265_process = T265Process(xyz_rpy_queue, xyz_rpy_value, encoder_v_queue)
-# mp.Process(target=t265_process.run).start()
-cv_process = CVProcess(target_queue, xyz_rpy_value)
-cv_process.run()
+t265_process = T265Process(xyz_rpy_queue, xyz_rpy_value, encoder_v_queue)
+t265_process.start()
+# mp.Process(target=t265_process.start).start()
+# cv_process = CVProcess(target_queue, xyz_rpy_value)
 # mp.Process(target=cv_process.run).start()
 
 while True:
     # get pose
     try:
-        connect_time, xyz_rpy = xyz_rpy_queue.get_nowait()
-        odom_table.putNumberArray('xyz_rpy', xyz_rpy)
-        last_t265_connect_time = connect_time
+        xyz_rpy = xyz_rpy_queue.get_nowait()
+        try: # empty the queue to retrieve the latest value
+            while True:
+                xyz_rpy = xyz_rpy_queue.get_nowait()
+        except Empty:
+            pass
+        for i, c in enumerate('xyzrpy'):
+            odom_table.putNumber(f'pose_{c}', xyz_rpy[i])
+        last_t265_connect_time = time.time()
         is_t265_connected = True
     except Empty:
         if time.time() - last_t265_connect_time > Constants.DISCONNECT_TIME:
             is_t265_connected = False
-    odom_table.putBoolean('is_t265_connected', is_t265_connected)
+    odom_table.putBoolean('pose_good', is_t265_connected)
 
     # get CV
     try:
-        connect_time, target_relative_angle, target_dis = target_queue.get_nowait()
-        # TODO adjust based on xyz_rpy to output absolute
-        # odom_table.putNumberArray('target', target)
-        last_CV_connect_time = connect_time
+        target_dis, target_relative_dir_right, target_abs_azm, target_relative_xyzrpy = \
+            target_queue.get_nowait()
+        for i, c in enumerate('xyzrpy'):
+            odom_table.putNumber(f'target_relative_{c}', target_relative_xyzrpy[i])
+        odom_table.putNumber(f'target_relative_dir_right', target_relative_dir_right)
+        odom_table.putNumber(f'target_abs_azm', target_abs_azm)
+        last_CV_connect_time = time.time()
         is_CV_connected = True
     except Empty:
         if time.time() - last_CV_connect_time > Constants.DISCONNECT_TIME:
             is_CV_connected = False
-    odom_table.putBoolean('is_CV_connected', is_CV_connected)
+    odom_table.putBoolean('target_good', is_CV_connected)
 
     # handshake
     odom_table.putNumber('slave_time', time.time())
+
     NetworkTables.flush()
     time.sleep(0.01)

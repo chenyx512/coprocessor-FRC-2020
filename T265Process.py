@@ -13,11 +13,14 @@ class T265Process:
     def run(self):
         pipeline_t265 = rs.pipeline()
         config_t265 = rs.config()
+        config_t265.enable_stream(rs.stream.pose)
         profile_t265 = pipeline_t265.start(config_t265)
+        self.logger.info("")
 
+        cnt = 0
         try:
             while True:
-                frames = pipeline_t265.wait_for_frames()
+                frames = pipeline_t265.wait_for_frames(timeout_ms=1000)
                 pose = frames.get_pose_frame()
                 if not pose:
                     raise Exception('no t265 pose')
@@ -27,19 +30,30 @@ class T265Process:
                 y = data.rotation.x
                 z = -data.rotation.y
 
-                pitch = -m.asin(2.0 * (x * z - w * y)) * 180.0 / m.pi;
-                roll = m.atan2(2.0 * (w * x + y * z), w * w - x * x - y * y + z * z) * 180.0 / m.pi;
-                yaw = m.atan2(2.0 * (w * z + x * y), w * w + x * x - y * y - z * z) * 180.0 / m.pi;
+                pitch = -m.asin(2.0 * (x * z - w * y)) * 180.0 / m.pi
+                roll = m.atan2(2.0 * (w * x + y * z), w * w - x * x - y * y + z * z) * 180.0 / m.pi
+                yaw = m.atan2(2.0 * (w * z + x * y), w * w + x * x - y * y - z * z) * 180.0 / m.pi
 
                 xyz_rpy = (-data.translation.z, -data.translation.x, data.translation.y,
-                           roll, pitch, yaw)
-                # self.logger.debug(f'xyz_ypr: {xyz_rpy}')
+                           roll, pitch, -yaw)
+                cnt += 1
+                if cnt % 20 == 0:
+                    self.logger.debug("xyz_ypr:" +
+                                      "".join(f"{v:7.2f}" for v in xyz_rpy))
                 self.xyz_rpy_value[0:6] = xyz_rpy
                 try:
-                    self.xyz_rpy_queue.put_nowait((xyz_rpy))
+                    self.xyz_rpy_queue.put_nowait(xyz_rpy)
                 except Full:
-                    pass
-                    # self.logger.warning('xyz_rpy_queue full')
+                    self.logger.warning('xyz_rpy_queue full')
         finally:
-            print("stop")
             pipeline_t265.stop()
+            self.logger.error("run method stops")
+
+    def start(self):
+        while True:
+            try:
+                self.logger.info("start run")
+                self.run()
+            except Exception:
+                print('caught exception')
+                self.logger.exception("exception uncaught")
