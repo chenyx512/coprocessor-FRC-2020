@@ -32,8 +32,9 @@ class Constants:
     EXTREME_VECTOR = np.array([[-1, -0.3], [-1, 2], [1, 2], [1, -0.3]])
     # TopLeft, ButLeft, ButRight, TopRight
 
-    # Connection
-    DISCONNECT_TIME = 1.0 # sec
+    # Connection, these constants may be changed for different process
+    DISCONNECT_DURATION = 1.0 # sec
+    RESTART_DURATION = 5.0 # sec
 
     DEBUG = True
 

@@ -8,9 +8,9 @@ from Constants import Constants
 
 
 class CVProcess:
-    def __init__(self, target_queue, xyz_rpy_value):
+    def __init__(self, target_queue, xyzrpy_value):
         self.target_queue = target_queue
-        self.xyz_rpy_value = xyz_rpy_value
+        self.xyz_rpy_value = xyzrpy_value
         self.logger = logging.getLogger(__name__)
 
     def run(self):
@@ -49,6 +49,9 @@ class CVProcess:
                     good_contour = approx
             if good_contour is None:
                 self.logger.debug('no good contour')
+                if Constants.DEBUG:
+                    cv2.imshow('target', frame)
+                    cv2.waitKey(1)
                 continue
 
             # get the four corners
@@ -58,14 +61,14 @@ class CVProcess:
             if Constants.DEBUG:
                 cv2.drawContours(frame, [good_contour], -1, (255, 0, 0))
                 for point in extreme_points:
-                    cv2.circle(frame, point, 4, (0, 0, 255), -1)
+                    cv2.circle(frame, tuple(point), 4, (0, 0, 255), -1)
                 cv2.imshow('target', frame)
                 cv2.imshow('filter', thresh)
                 cv2.waitKey(1)
 
             # solvePnP
             ret, rvec, tvec = cv2.solvePnP(Constants.TARGET_3D,
-                                           np.array(extreme_points).astype(np.float32),
+                                           extreme_points.astype(np.float32),
                                            Constants.CAMERA_MATRIX,
                                            Constants.DISTORTION_COEF)
             if not ret:
@@ -74,9 +77,9 @@ class CVProcess:
             # transform to WPI robotics convention
             pitch, row, yaw = rvec[:, 0] / math.pi * 180
             y, z, x = tvec[:, 0] * (-1, -1, 1)
-            target_relative_xyz_rpy = (x, y, z, row, pitch, yaw)
+            target_relative_xyzrpy = (x, y, z, row, pitch, yaw)
             self.logger.debug("relative xyz_ypr:" +
-                              ''.join(f"{v:7.2f}" for v in target_relative_xyz_rpy))
+                              ''.join(f"{v:7.2f}" for v in target_relative_xyzrpy))
             # target distance too big means it is wrong
             target_distance = math.sqrt(x * x + y * y + z * z)
             if target_distance > Constants.MAX_TARGET_DISTANCE:
@@ -92,13 +95,13 @@ class CVProcess:
                 self.target_queue.put_nowait((target_distance,
                                               target_relative_dir_right,
                                               target_absolute_azm,
-                                              target_relative_xyz_rpy[0:6]))
+                                              target_relative_xyzrpy[0:6]))
             except Full:
                 self.logger.warning('target_queue full')
 
     def start(self):
-        while True:
-            try:
-                self.run()
-            except Exception as e:
-                self.logger.exception("exception uncaught", e)
+        try:
+            self.run()
+        except Exception:
+            self.logger.exception("exception uncaught in process_method, "
+                                  "wait for root process to restart this")
