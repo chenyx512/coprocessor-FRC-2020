@@ -9,20 +9,24 @@ from Constants import Constants
 
 
 class CVProcess(mp.Process):
+    DEBUG_PERIOD = 30
+
     def __init__(self, target_queue, xyzrpy_value):
         super().__init__()
         self.target_queue = target_queue
         self.xyz_rpy_value = xyzrpy_value
         self.logger = logging.getLogger(__name__)
+        self.cnt = 0
 
     def process_method(self):
-        cap = cv2.VideoCapture(3) # change when debugging on local
+        cap = cv2.VideoCapture(0) # change when debugging on local
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, Constants.EXPOSURE_AUTO)
         cap.set(cv2.CAP_PROP_EXPOSURE, Constants.EXPOSURE_ABS)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, Constants.HEIGHT)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, Constants.WIDTH)
 
         while True:
+            self.cnt += 1
             ret, frame = cap.read()
             if not ret:
                 raise Exception('no frame')
@@ -50,7 +54,8 @@ class CVProcess(mp.Process):
                         break
                     good_contour = approx
             if good_contour is None:
-                # self.logger.debug('no good contour')
+                self.debug('no good contour')
+                self.put_no_target()
                 if Constants.DEBUG:
                     cv2.imshow('target', frame)
                     cv2.waitKey(1)
@@ -74,32 +79,45 @@ class CVProcess(mp.Process):
                                            Constants.CAMERA_MATRIX,
                                            Constants.DISTORTION_COEF)
             if not ret:
-                self.logger.debug('target not matched')
+                self.debug('target not matched')
+                self.put_no_target()
                 continue
             # transform to WPI robotics convention
             pitch, row, yaw = rvec[:, 0] / math.pi * 180
             y, z, x = tvec[:, 0] * (-1, -1, 1)
             target_relative_xyzrpy = (x, y, z, row, pitch, yaw)
-            self.logger.debug("relative xyz_ypr:" +
-                              ''.join(f"{v:7.2f}" for v in target_relative_xyzrpy))
+            self.debug("relative xyz_ypr:" +
+                       ''.join(f"{v:7.2f}" for v in target_relative_xyzrpy))
             # target distance too big means it is wrong
             target_distance = math.sqrt(x * x + y * y + z * z)
             if target_distance > Constants.MAX_TARGET_DISTANCE:
                 self.logger.warning(f'target distance {target_distance} too big')
+                self.put_no_target()
                 continue
 
             target_relative_dir_right = math.atan2(y, x) / math.pi * 180
             target_absolute_azm = frame_yaw + target_relative_dir_right
-            self.logger.debug(f'distance {target_distance:5.2f} '
-                              f'toleft {target_relative_dir_right:5.1f} '
-                              f'abs_azm {target_absolute_azm:5.1f}')
+            self.debug(f'distance {target_distance:5.2f} '
+                       f'toleft {target_relative_dir_right:5.1f} '
+                       f'abs_azm {target_absolute_azm:5.1f}')
             try:
-                self.target_queue.put_nowait((target_distance,
+                self.target_queue.put_nowait((True,
+                                              target_distance,
                                               target_relative_dir_right,
                                               target_absolute_azm,
                                               target_relative_xyzrpy[0:6]))
             except Full:
                 self.logger.warning('target_queue full')
+
+    def put_no_target(self):
+        try:
+            self.target_queue.put_nowait((False, None, None, None, None))
+        except Full:
+            self.logger.warning('target_queue full')
+
+    def debug(self, msg):
+        if self.cnt % self.DEBUG_PERIOD == 0:
+            self.logger.debug(msg)
 
     def run(self):
         try:
