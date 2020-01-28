@@ -37,9 +37,12 @@ class CVProcess(mp.Process):
             frame_HSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             thresh = cv2.inRange(frame_HSV, Constants.HSV_LOW, Constants.HSV_HIGH)
             # thresh = cv2.blur(thresh, (5, 5)) # may not be necessary
-            contours = np.array([])
-            cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE,
-                             contours) # backward compat with opencv3
+            if cv2.__version__.startswith('4'):
+                contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
+                        cv2.CHAIN_APPROX_SIMPLE)
+            else:
+                _, contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
+                        cv2.CHAIN_APPROX_SIMPLE)
 
             # find target contour
             good_contour = None
