@@ -66,17 +66,19 @@ def t265_update():
 
 def cv_update():
     try:
-        target_dis, target_relative_dir_right, target_abs_azm, \
-        target_relative_xyzrpy = target_queue.get_nowait()
-        for i, c in enumerate('xyzrpy'):
-            odom_table.putNumber(f'target_relative_{c}',
-                                 target_relative_xyzrpy[i])
-        odom_table.putNumber('target_dis', target_dis)
-        odom_table.putNumber('target_relative_dir_right',
-                             target_relative_dir_right)
-        odom_table.putNumber('target_abs_azm', target_abs_azm)
+        target_found, target_dis, target_relative_dir_right, \
+        target_abs_azm, target_relative_xyzrpy = target_queue.get_nowait()
+        odom_table.putBoolean('target_found', target_found)
+        if target_found:
+            for i, c in enumerate('xyzrpy'):
+                odom_table.putNumber(f'target_relative_{c}',
+                                     target_relative_xyzrpy[i])
+            odom_table.putNumber('target_dis', target_dis)
+            odom_table.putNumber('target_relative_dir_right',
+                                 target_relative_dir_right)
+            odom_table.putNumber('target_abs_azm', target_abs_azm)
         return True
-    except:
+    except Empty:
         return False
 
 t265_process_manager = ProcessManager(

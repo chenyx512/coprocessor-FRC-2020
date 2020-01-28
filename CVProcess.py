@@ -45,33 +45,32 @@ class CVProcess(mp.Process):
             for contour in contours:
                 if cv2.contourArea(contour) < Constants.MIN_TARGET_AREA:
                     continue
-                epsilon = 0.02 * cv2.arcLength(contour, closed=True)
+                epsilon = 0.01 * cv2.arcLength(contour, closed=True)
                 approx = cv2.approxPolyDP(contour, epsilon, closed=True)
+                cv2.drawContours(frame, [approx], 0, (255, 0, 0), 3)
                 if 7 <= len(approx) <= 9:
                     if good_contour is not None:
                         self.logger.warning('two good contours found, break')
                         good_contour = None
                         break
-                    good_contour = approx
+                    good_contour = contour
             if good_contour is None:
-                self.debug('no good contour')
-                self.put_no_target()
                 if Constants.DEBUG:
                     cv2.imshow('target', frame)
+                    cv2.imshow('filter', thresh)
                     cv2.waitKey(1)
+                self.debug('no good contour')
+                self.put_no_target()
                 continue
 
             # get the four corners
             arg_extreme_points = np.matmul(Constants.EXTREME_VECTOR,
-                                           good_contour[:, 0, :].transpose()).argmax(axis=-1)
+                                           good_contour[:, 0, :].T).argmax(axis=-1)
             extreme_points = np.take(good_contour, arg_extreme_points, axis=0).squeeze()
             if Constants.DEBUG:
                 cv2.drawContours(frame, [good_contour], -1, (255, 0, 0))
                 for point in extreme_points:
                     cv2.circle(frame, tuple(point), 4, (0, 0, 255), -1)
-                cv2.imshow('target', frame)
-                cv2.imshow('filter', thresh)
-                cv2.waitKey(1)
 
             # solvePnP
             ret, rvec, tvec = cv2.solvePnP(Constants.TARGET_3D,
@@ -80,8 +79,17 @@ class CVProcess(mp.Process):
                                            Constants.DISTORTION_COEF)
             if not ret:
                 self.debug('target not matched')
+                if Constants.DEBUG:
+                    cv2.imshow('target', frame)
+                    cv2.imshow('filter', thresh)
+                    cv2.waitKey(1)
                 self.put_no_target()
                 continue
+            # calculate world coordinate
+            rotation_matrix, _ = cv2.Rodrigues(rvec)
+            world_coord = np.matmul(rotation_matrix.T, -tvec).flatten()
+            self.debug("world_coord:" +
+                       ''.join(f"{v:7.2f}" for v in world_coord))
             # transform to WPI robotics convention
             pitch, row, yaw = rvec[:, 0] / math.pi * 180
             y, z, x = tvec[:, 0] * (-1, -1, 1)
@@ -106,6 +114,10 @@ class CVProcess(mp.Process):
                                               target_relative_dir_right,
                                               target_absolute_azm,
                                               target_relative_xyzrpy[0:6]))
+                if Constants.DEBUG:
+                    cv2.imshow('target', frame)
+                    cv2.imshow('filter', thresh)
+                    cv2.waitKey(1)
             except Full:
                 self.logger.warning('target_queue full')
 

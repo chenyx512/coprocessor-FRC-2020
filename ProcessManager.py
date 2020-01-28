@@ -39,20 +39,25 @@ class ProcessManager:
                                rate * (1 - Constants.MA_MOMENTUM)
             self.last_connect_time = time.time()
             self.is_connected = True
-        else:
+        elif not Constants.DEBUG: # no killing when debug
             if time.time() - self.last_connect_time > self.disconnect_duration:
                 self.is_connected = False
-            if not self.is_connected and \
-                    time.time() - self.last_connect_time > self.restart_duration:
-                self.logger.error('process disconnected, try restart')
-                if self.process.is_alive():
-                    self.logger.error('process still alive, kill first')
-                    self.process.terminate()
-
-                self.process = self.new_process_fn()
-                self.process.start()
-                self.last_connect_time = time.time()
+            if not self.is_connected:
+                if not self.process.is_alive():
+                    self.logger.error("process died, restart it")
+                    self.restart_process()
+                elif time.time() - self.last_connect_time > self.restart_duration:
+                    self.logger.error('process disconnected too long, '
+                                      'kill and restart')
+                    self.restart_process()
 
         if time.time() - self.last_update_time > Constants.UPDATE_PERIOD:
             self.logger.info(f"update rate {self.update_rate:4.1f}hz")
             self.last_update_time = time.time()
+
+    def restart_process(self):
+        if not self.process.is_alive():
+            self.process.terminate()
+        self.process = self.new_process_fn()
+        self.process.start()
+        self.last_connect_time = time.time()
