@@ -6,11 +6,14 @@ from datetime import datetime
 from networktables import NetworkTables
 from queue import Full, Empty
 import yaml
+import numpy as np
+from cscore import CameraServer
 
 from ProcessManager import ProcessManager
 from T265Process import T265Process
 from CVProcess import CVProcess
 from Constants import Constants
+
 
 # logging setup
 with open('config/logging_config.yaml', 'r') as yaml_file:
@@ -24,8 +27,13 @@ logging.config.dictConfig(logging_config)
 # shared
 encoder_v_queue = mp.Queue(1)
 xyz_rpy_queue = mp.Queue(1)
+frame_queue = mp.Queue(1)
 xyzrpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
+outputs = {
+    'frame': CameraServer.getInstance().putVideo('frame', Constants.WIDTH, Constants.HEIGHT),
+    'thresh': CameraServer.getInstance().putVideo('thresh', Constants.WIDTH, Constants.HEIGHT),
+}
 
 
 def encoder_callback(entry, key, value, is_new):
@@ -58,7 +66,7 @@ def t265_update():
     try:
         xyz_rpy_queue.get_nowait()
         xyz_rpy = xyzrpy_value[0:6]
-        for i, c in enumerate('xyzrpy'):
+        for i, c in enumerate('xyzrpt'):
             odom_table.putNumber(f'pose_{c}', xyz_rpy[i])
         return True
     except Empty:
@@ -66,11 +74,17 @@ def t265_update():
 
 def cv_update():
     try:
+        while True:
+            name, frame = frame_queue.get_nowait()
+            outputs[name].putFrame(frame)
+    except Empty:
+        pass
+    try:
         target_found, target_dis, target_relative_dir_right, \
         target_abs_azm, target_relative_xyzrpy = target_queue.get_nowait()
         odom_table.putBoolean('target_found', target_found)
         if target_found:
-            for i, c in enumerate('xyzrpy'):
+            for i, c in enumerate('xyzrpt'):
                 odom_table.putNumber(f'target_relative_{c}',
                                      target_relative_xyzrpy[i])
             odom_table.putNumber('target_dis', target_dis)
@@ -86,7 +100,7 @@ t265_process_manager = ProcessManager(
     t265_update,
 )
 cv_process_manager = ProcessManager(
-    lambda: CVProcess(target_queue, xyzrpy_value),
+    lambda: CVProcess(target_queue, xyzrpy_value, frame_queue),
     cv_update,
 )
 

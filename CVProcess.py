@@ -11,11 +11,12 @@ from Constants import Constants
 class CVProcess(mp.Process):
     DEBUG_PERIOD = 30
 
-    def __init__(self, target_queue, xyzrpy_value):
+    def __init__(self, target_queue, xyzrpy_value, frame_queue):
         super().__init__()
         self.target_queue = target_queue
         self.xyz_rpy_value = xyzrpy_value
         self.logger = logging.getLogger(__name__)
+        self.frame_queue = frame_queue
         self.cnt = 0
 
     def process_method(self):
@@ -37,6 +38,8 @@ class CVProcess(mp.Process):
             frame_HSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             thresh = cv2.inRange(frame_HSV, Constants.HSV_LOW, Constants.HSV_HIGH)
             # thresh = cv2.blur(thresh, (5, 5)) # may not be necessary
+            if Constants.DEBUG:
+                self.putFrame('thresh', thresh)
             if cv2.__version__.startswith('4'):
                 contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                         cv2.CHAIN_APPROX_SIMPLE)
@@ -60,9 +63,7 @@ class CVProcess(mp.Process):
                     good_contour = contour
             if good_contour is None:
                 if Constants.DEBUG:
-                    cv2.imshow('target', frame)
-                    cv2.imshow('filter', thresh)
-                    cv2.waitKey(1)
+                    self.putFrame('frame', frame)
                 self.debug('no good contour')
                 self.put_no_target()
                 continue
@@ -84,9 +85,7 @@ class CVProcess(mp.Process):
             if not ret:
                 self.debug('target not matched')
                 if Constants.DEBUG:
-                    cv2.imshow('target', frame)
-                    cv2.imshow('filter', thresh)
-                    cv2.waitKey(1)
+                    self.putFrame('frame', frame)
                 self.put_no_target()
                 continue
             # calculate world coordinate
@@ -119,9 +118,7 @@ class CVProcess(mp.Process):
                                               target_absolute_azm,
                                               target_relative_xyzrpy[0:6]))
                 if Constants.DEBUG:
-                    cv2.imshow('target', frame)
-                    cv2.imshow('filter', thresh)
-                    cv2.waitKey(1)
+                    self.putFrame('frame', frame)
             except Full:
                 self.logger.warning('target_queue full')
 
@@ -134,6 +131,12 @@ class CVProcess(mp.Process):
     def debug(self, msg):
         if self.cnt % self.DEBUG_PERIOD == 0:
             self.logger.debug(msg)
+
+    def putFrame(self, name, frame):
+            try:
+                self.frame_queue.put_nowait((name, frame))
+            except Full:
+                pass
 
     def run(self):
         try:
