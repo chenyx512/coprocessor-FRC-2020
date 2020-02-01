@@ -7,12 +7,13 @@ from networktables import NetworkTables
 from queue import Full, Empty
 import yaml
 import numpy as np
-from cscore import CameraServer
 
-from ProcessManager import ProcessManager
 from T265Process import T265Process
 from CVProcess import CVProcess
 from Constants import Constants
+from ProcessManager import ProcessManager
+from util.transformation import getRotationMatrix2d
+from util.CameraServerWrapper import CameraServerWrapper
 
 
 # logging setup
@@ -30,10 +31,6 @@ xyz_rpy_queue = mp.Queue(1)
 frame_queue = mp.Queue(1)
 xyzrpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
-outputs = {
-    'frame': CameraServer.getInstance().putVideo('frame', Constants.WIDTH, Constants.HEIGHT),
-    'thresh': CameraServer.getInstance().putVideo('thresh', Constants.WIDTH, Constants.HEIGHT),
-}
 
 
 def encoder_callback(entry, key, value, is_new):
@@ -44,14 +41,14 @@ def encoder_callback(entry, key, value, is_new):
             logging.warning('encoder_v queue full')
 
 # NTable
-ip = 'roborio-3566-frc.local'
-logging.info(f'starting NTable with ip [{ip}]')
-NetworkTables.initialize(ip if ip != 'host' else None)
+logging.info(f'start networktable client for 3566')
+NetworkTables.startClientTeam(3566)
 odom_table = NetworkTables.getTable('odom')
 NetworkTables.getEntry('/odom/encoder_v').addListener(
     encoder_callback,
     NetworkTables.NotifyFlags.UPDATE
 )
+camera_server = CameraServerWrapper()
 
 # status flag
 is_t265_connected = False
@@ -60,6 +57,7 @@ is_CV_connected = False
 last_CV_connect_time = time.time()
 slave_handshake_cnt = 0
 
+dtheta = dt = 0
 
 # processes
 def t265_update():
@@ -76,21 +74,28 @@ def cv_update():
     try:
         while True:
             name, frame = frame_queue.get_nowait()
-            outputs[name].putFrame(frame)
+            camera_server.put_frame(name, frame)
     except Empty:
         pass
     try:
         target_found, target_dis, target_relative_dir_right, \
-        target_abs_azm, target_relative_xyzrpy = target_queue.get_nowait()
+                world_xyt = target_queue.get_nowait()
+        # TODO update with t265 data to calibrate
+        # TODO check if target is on opposite side (may not need to)
         odom_table.putBoolean('target_found', target_found)
         if target_found:
-            for i, c in enumerate('xyzrpt'):
-                odom_table.putNumber(f'target_relative_{c}',
-                                     target_relative_xyzrpy[i])
+            global dtheta, dt
+            dtheta = world_xyt[-1] - xyzrpy_value[-1]
+            world_xvec = np.array([world_xyt[0], world_xyt[1]])
+            camera_xvec = np.array(xyzrpy_value[0:2])
+            dt = world_xvec - np.matmul(getRotationMatrix2d(dtheta), camera_xvec)
+            print(dt)
+            for i, c in enumerate('xyt'):
+                odom_table.putNumber(f'world_{c}',
+                                     world_xyt[i])
             odom_table.putNumber('target_dis', target_dis)
             odom_table.putNumber('target_relative_dir_right',
                                  target_relative_dir_right)
-            odom_table.putNumber('target_abs_azm', target_abs_azm)
         return True
     except Empty:
         return False

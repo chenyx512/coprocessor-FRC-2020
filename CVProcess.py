@@ -20,7 +20,7 @@ class CVProcess(mp.Process):
         self.cnt = 0
 
     def process_method(self):
-        cap = cv2.VideoCapture(0) # change when debugging on local
+        cap = cv2.VideoCapture(2) # change when debugging on local
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, Constants.EXPOSURE_AUTO)
         cap.set(cv2.CAP_PROP_EXPOSURE, Constants.EXPOSURE_ABS)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, Constants.HEIGHT)
@@ -90,33 +90,30 @@ class CVProcess(mp.Process):
                 continue
             # calculate world coordinate
             rotation_matrix, _ = cv2.Rodrigues(rvec)
-            world_coord = np.matmul(rotation_matrix.T, -tvec).flatten()
+            world_xyz = np.matmul(rotation_matrix.T, -tvec).flatten()
+            world_x, world_y, world_z = world_xyz
             self.debug("world_coord:" +
-                       ''.join(f"{v:7.2f}" for v in world_coord))
-            # transform to WPI robotics convention
-            pitch, row, yaw = rvec[:, 0] / math.pi * 180
-            y, z, x = tvec[:, 0] * (-1, -1, 1)
-            target_relative_xyzrpy = (x, y, z, row, pitch, yaw)
-            self.debug("relative xyz_ypr:" +
-                       ''.join(f"{v:7.2f}" for v in target_relative_xyzrpy))
+                       ''.join(f"{v:7.2f}" for v in world_xyz))
+            target_distance = math.sqrt(world_x**2 + world_y**2)
             # target distance too big means it is wrong
-            target_distance = math.sqrt(x * x + y * y + z * z)
             if target_distance > Constants.MAX_TARGET_DISTANCE:
                 self.logger.warning(f'target distance {target_distance} too big')
                 self.put_no_target()
                 continue
-
+            # transform to WPI robotics convention
+            pitch, row, yaw = rvec[:, 0] / math.pi * 180
+            y, z, x = tvec[:, 0] * (-1, -1, 1)
             target_relative_dir_right = math.atan2(y, x) / math.pi * 180
-            target_absolute_azm = frame_yaw + target_relative_dir_right
+            world_theta = math.atan2(world_y, world_x) / math.pi * 180\
+                          - 180 + target_relative_dir_right
             self.debug(f'distance {target_distance:5.2f} '
                        f'toleft {target_relative_dir_right:5.1f} '
-                       f'abs_azm {target_absolute_azm:5.1f}')
+                       f'world_theta {world_theta:5.1f} ')
             try:
                 self.target_queue.put_nowait((True,
                                               target_distance,
                                               target_relative_dir_right,
-                                              target_absolute_azm,
-                                              target_relative_xyzrpy[0:6]))
+                                              [world_x, world_y, world_theta]))
                 if Constants.DEBUG:
                     self.putFrame('frame', frame)
             except Full:
@@ -124,7 +121,7 @@ class CVProcess(mp.Process):
 
     def put_no_target(self):
         try:
-            self.target_queue.put_nowait((False, None, None, None, None))
+            self.target_queue.put_nowait((False, None, None, None))
         except Full:
             self.logger.warning('target_queue full')
 

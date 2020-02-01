@@ -23,13 +23,13 @@ class ProcessManager:
         self.process = self.new_process_fn()
         self.logger = logging.getLogger(type(self.process).__name__ + 'Manager')
         self.logger.info('start process')
-        self.process.start()
-
 
         self.last_connect_time = time.time()
         self.update_rate = 0
         self.is_connected = False
         self.last_update_time = time.time()
+
+        self.process.start()
 
 
     def update(self):

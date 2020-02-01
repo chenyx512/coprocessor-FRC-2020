@@ -88,3 +88,13 @@ def get_xyzrpy(data):
     xyzrpy = (-data.translation.z, -data.translation.x, data.translation.y,
                roll, pitch, -yaw)
     return xyzrpy
+
+"""
+given t265  xvec0, theta0
+      field xvec1, theta1
+dtheta = theta1 - theta0
+let R be the rotation vector of dtheta
+dt = xvec1 - R dxvec0
+field coord = R xvec_t265 + dt
+ntable store dtheta and 
+"""

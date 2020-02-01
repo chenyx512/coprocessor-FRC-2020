@@ -41,3 +41,4 @@ class Constants:
     UPDATE_PERIOD = 3 # sec
 
 # 100, 400; 100 100
+# euler from t265 to WPI 180, -90 + xx, 90
