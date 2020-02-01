@@ -89,6 +89,8 @@ t265_process_manager = ProcessManager(
 
 calibration_cnt_left = 0
 def cv_update():
+    global calibration_cnt_left, dtheta_array, dt_array, calibrated_dt,\
+        calibrated_dtheta
     try:
         while True:
             name, frame = frame_queue.get_nowait()
@@ -108,7 +110,6 @@ def cv_update():
             logging.info("start field calibration")
             calibration_cnt_left = 10
             odom_table.putBoolean('field_calibration_start', False)
-            global dtheta_array, dt_array
             dtheta_array = []
             dt_array = []
 
@@ -121,7 +122,6 @@ def cv_update():
             dt_array.append(dt)
             calibration_cnt_left -= 1
             if calibration_cnt_left == 0:
-                global calibrated_dt, calibrated_dtheta
                 calibrated_dt = np.median(dt_array)
                 calibrated_dtheta = np.median(dtheta_array)
                 logging.info("end field calibration with"
