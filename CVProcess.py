@@ -60,6 +60,7 @@ class CVProcess(mp.Process):
                         good_contour = None
                         break
                     good_contour = contour
+            
             if good_contour is None:
                 self.putFrame('frame', frame)
                 self.debug('no good contour')
@@ -104,7 +105,7 @@ class CVProcess(mp.Process):
             target_relative_dir_right = math.atan2(y, x) / math.pi * 180
             target_t265_azm = frame_yaw + target_relative_dir_right
             field_theta = math.atan2(field_y, field_x) / math.pi * 180\
-                          - 180 + target_relative_dir_right
+                          + target_relative_dir_right
             self.debug(f'distance {target_distance:5.2f} '
                        f'toleft {target_relative_dir_right:5.1f} '
                        f'field_theta {field_theta:5.1f} ')
