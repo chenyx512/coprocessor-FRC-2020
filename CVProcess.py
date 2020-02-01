@@ -20,7 +20,7 @@ class CVProcess(mp.Process):
         self.cnt = 0
 
     def process_method(self):
-        cap = cv2.VideoCapture(2) # change when debugging on local
+        cap = cv2.VideoCapture(0) # change when debugging on local
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, Constants.EXPOSURE_AUTO)
         cap.set(cv2.CAP_PROP_EXPOSURE, Constants.EXPOSURE_ABS)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, Constants.HEIGHT)
@@ -38,8 +38,7 @@ class CVProcess(mp.Process):
             frame_HSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             thresh = cv2.inRange(frame_HSV, Constants.HSV_LOW, Constants.HSV_HIGH)
             # thresh = cv2.blur(thresh, (5, 5)) # may not be necessary
-            if Constants.DEBUG:
-                self.putFrame('thresh', thresh)
+            self.putFrame('thresh', thresh)
             if cv2.__version__.startswith('4'):
                 contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                         cv2.CHAIN_APPROX_SIMPLE)
@@ -62,8 +61,7 @@ class CVProcess(mp.Process):
                         break
                     good_contour = contour
             if good_contour is None:
-                if Constants.DEBUG:
-                    self.putFrame('frame', frame)
+                self.putFrame('frame', frame)
                 self.debug('no good contour')
                 self.put_no_target()
                 continue
@@ -72,10 +70,9 @@ class CVProcess(mp.Process):
             arg_extreme_points = np.matmul(Constants.EXTREME_VECTOR,
                                            good_contour[:, 0, :].T).argmax(axis=-1)
             extreme_points = np.take(good_contour, arg_extreme_points, axis=0).squeeze()
-            if Constants.DEBUG:
-                cv2.drawContours(frame, [good_contour], -1, (255, 0, 0))
-                for point in extreme_points:
-                    cv2.circle(frame, tuple(point), 4, (0, 0, 255), -1)
+            cv2.drawContours(frame, [good_contour], -1, (255, 0, 0))
+            for point in extreme_points:
+                cv2.circle(frame, tuple(point), 4, (0, 0, 255), -1)
 
             # solvePnP
             ret, rvec, tvec = cv2.solvePnP(Constants.TARGET_3D,
@@ -84,44 +81,46 @@ class CVProcess(mp.Process):
                                            Constants.DISTORTION_COEF)
             if not ret:
                 self.debug('target not matched')
-                if Constants.DEBUG:
-                    self.putFrame('frame', frame)
+                self.putFrame('frame', frame)
                 self.put_no_target()
                 continue
-            # calculate world coordinate
+
+            # calculate field coordinate
             rotation_matrix, _ = cv2.Rodrigues(rvec)
-            world_xyz = np.matmul(rotation_matrix.T, -tvec).flatten()
-            world_x, world_y, world_z = world_xyz
-            self.debug("world_coord:" +
-                       ''.join(f"{v:7.2f}" for v in world_xyz))
-            target_distance = math.sqrt(world_x**2 + world_y**2)
+            field_xyz = np.matmul(rotation_matrix.T, -tvec).flatten()
+            field_x, field_y, field_z = field_xyz
+            self.debug("field_coord:" +
+                       ''.join(f"{v:7.2f}" for v in field_xyz))
+
+            target_distance = math.hypot(field_x, field_y)
             # target distance too big means it is wrong
             if target_distance > Constants.MAX_TARGET_DISTANCE:
                 self.logger.warning(f'target distance {target_distance} too big')
                 self.put_no_target()
                 continue
+
             # transform to WPI robotics convention
-            pitch, row, yaw = rvec[:, 0] / math.pi * 180
             y, z, x = tvec[:, 0] * (-1, -1, 1)
             target_relative_dir_right = math.atan2(y, x) / math.pi * 180
-            world_theta = math.atan2(world_y, world_x) / math.pi * 180\
+            target_t265_azm = frame_yaw + target_relative_dir_right
+            field_theta = math.atan2(field_y, field_x) / math.pi * 180\
                           - 180 + target_relative_dir_right
             self.debug(f'distance {target_distance:5.2f} '
                        f'toleft {target_relative_dir_right:5.1f} '
-                       f'world_theta {world_theta:5.1f} ')
+                       f'field_theta {field_theta:5.1f} ')
             try:
                 self.target_queue.put_nowait((True,
                                               target_distance,
                                               target_relative_dir_right,
-                                              [world_x, world_y, world_theta]))
-                if Constants.DEBUG:
-                    self.putFrame('frame', frame)
+                                              target_t265_azm,
+                                              [field_x, field_y, field_theta]))
+                self.putFrame('frame', frame)
             except Full:
                 self.logger.warning('target_queue full')
 
     def put_no_target(self):
         try:
-            self.target_queue.put_nowait((False, None, None, None))
+            self.target_queue.put_nowait((False, None, None, None, None))
         except Full:
             self.logger.warning('target_queue full')
 

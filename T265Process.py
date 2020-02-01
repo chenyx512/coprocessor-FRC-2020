@@ -92,9 +92,9 @@ def get_xyzrpy(data):
 """
 given t265  xvec0, theta0
       field xvec1, theta1
-dtheta = theta1 - theta0
-let R be the rotation vector of dtheta
-dt = xvec1 - R dxvec0
-field coord = R xvec_t265 + dt
-ntable store dtheta and 
+calibrated_dtheta = theta1 - theta0
+let R be the rotation vector of calibrated_dtheta
+calibrated_dt = xvec1 - R dxvec0
+field coord = R xvec_t265 + calibrated_dt
+ntable store calibrated_dtheta and 
 """

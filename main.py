@@ -7,6 +7,7 @@ from networktables import NetworkTables
 from queue import Full, Empty
 import yaml
 import numpy as np
+import math
 
 from T265Process import T265Process
 from CVProcess import CVProcess
@@ -57,7 +58,9 @@ is_CV_connected = False
 last_CV_connect_time = time.time()
 slave_handshake_cnt = 0
 
-dtheta = dt = 0
+# transformation of coord
+calibrated_dt = calibrated_dtheta = 0
+field_xyt = [0.0, 0.0, 0.0]
 
 # processes
 def t265_update():
@@ -65,11 +68,26 @@ def t265_update():
         xyz_rpy_queue.get_nowait()
         xyz_rpy = xyzrpy_value[0:6]
         for i, c in enumerate('xyzrpt'):
-            odom_table.putNumber(f'pose_{c}', xyz_rpy[i])
+            odom_table.putNumber(f't265_pose_{c}', xyz_rpy[i])
+
+        field_xvec = calibrated_dt + np.matmul(getRotationMatrix2d(calibrated_dtheta),
+                                               [xyz_rpy[0], xyz_rpy[1]])
+        global field_xyt
+        field_xyt = field_xvec.tolist()
+        field_xyt.append(xyz_rpy[-1] + calibrated_dtheta)
+        for i, c in enumerate('xyt'):
+            odom_table.putNumber(f'field_pose_{c}', field_xyt[i])
+        odom_table.putNumber('target_field_azm',
+                             math.degrees(math.atan2(field_xyt[1], field_xyt[0])) - 180)
         return True
     except Empty:
         return False
+t265_process_manager = ProcessManager(
+    lambda: T265Process(xyz_rpy_queue, xyzrpy_value, encoder_v_queue),
+    t265_update,
+)
 
+calibration_cnt_left = 0
 def cv_update():
     try:
         while True:
@@ -79,31 +97,56 @@ def cv_update():
         pass
     try:
         target_found, target_dis, target_relative_dir_right, \
-                world_xyt = target_queue.get_nowait()
-        # TODO update with t265 data to calibrate
+                target_t265_azm, camera_xyt = target_queue.get_nowait()
         # TODO check if target is on opposite side (may not need to)
         odom_table.putBoolean('target_found', target_found)
-        if target_found:
-            global dtheta, dt
-            dtheta = world_xyt[-1] - xyzrpy_value[-1]
-            world_xvec = np.array([world_xyt[0], world_xyt[1]])
+        if not target_found:
+            odom_table.putBoolean('target_found', False)
+            return True
+
+        if odom_table.getBoolean('field_calibration_start', False):
+            logging.info("start field calibration")
+            calibration_cnt_left = 10
+            odom_table.putBoolean('field_calibration_start', False)
+            global dtheta_array, dt_array
+            dtheta_array = []
+            dt_array = []
+
+        if calibration_cnt_left != 0:
+            dtheta = camera_xyt[-1] - xyzrpy_value[-1]
+            field_xvec = np.array([camera_xyt[0], camera_xyt[1]])
             camera_xvec = np.array(xyzrpy_value[0:2])
-            dt = world_xvec - np.matmul(getRotationMatrix2d(dtheta), camera_xvec)
-            print(dt)
-            for i, c in enumerate('xyt'):
-                odom_table.putNumber(f'world_{c}',
-                                     world_xyt[i])
-            odom_table.putNumber('target_dis', target_dis)
-            odom_table.putNumber('target_relative_dir_right',
-                                 target_relative_dir_right)
+            dt = field_xvec - np.matmul(getRotationMatrix2d(dtheta), camera_xvec)
+            dtheta_array.append(dtheta)
+            dt_array.append(dt)
+            calibration_cnt_left -= 1
+            if calibration_cnt_left == 0:
+                global calibrated_dt, calibrated_dtheta
+                calibrated_dt = np.median(dt_array)
+                calibrated_dtheta = np.median(dtheta_array)
+                logging.info("end field calibration with"
+                             f"dt {calibrated_dt}, dtheta {calibrated_dtheta}")
+                odom_table.putBoolean('field_calibration_good', True)
+
+        for i, c in enumerate('xyt'):
+            odom_table.putNumber(f'field_{c}', camera_xyt[i])
+        odom_table.putNumber('target_t265_azm', target_t265_azm)
+        odom_table.putNumber('target_dis', target_dis)
+        odom_table.putNumber('target_relative_dir_right',
+                             target_relative_dir_right)
+
+        if odom_table.getBoolean('field_calibration_good', False):
+            error_xy = math.hypot(camera_xyt[0] - field_xyt[0],
+                                  camera_xyt[1] - field_xyt[1])
+            error_theta = camera_xyt[2] - field_xyt[2]
+            odom_table.putNumber('error_xy', error_xy)
+            odom_table.putNumber('error_theta', error_theta)
+
         return True
     except Empty:
+        odom_table.putBoolean('target_found', False)
         return False
 
-t265_process_manager = ProcessManager(
-    lambda: T265Process(xyz_rpy_queue, xyzrpy_value, encoder_v_queue),
-    t265_update,
-)
 cv_process_manager = ProcessManager(
     lambda: CVProcess(target_queue, xyzrpy_value, frame_queue),
     cv_update,
@@ -120,7 +163,7 @@ while True:
     odom_table.putBoolean('target_good', cv_process_manager.is_connected)
 
     # handshake
-    odom_table.putNumber('slave_time', time.time())
+    odom_table.putNumber('client_time', time.time())
 
     NetworkTables.flush()
     time.sleep(0.01)
