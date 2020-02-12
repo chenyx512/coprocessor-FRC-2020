@@ -78,7 +78,7 @@ def t265_update():
         for i, c in enumerate('xyt'):
             odom_table.putNumber(f'field_pose_{c}', field_xyt[i])
         odom_table.putNumber('target_field_azm',
-                             math.degrees(math.atan2(field_xyt[1], field_xyt[0])))
+                             math.degrees(math.atan2(field_xyt[1], field_xyt[0])) - 180)
         return True
     except Empty:
         return False
@@ -105,10 +105,10 @@ def cv_update():
         if not target_found:
             return True
 
-        if odom_table.getBoolean('field_calib_start', False):
+        if odom_table.getBoolean('field_calibration_start', False):
             logging.info("start field calibration")
             calibration_cnt_left = 10
-            odom_table.putBoolean('field_calib_start', False)
+            odom_table.putBoolean('field_calibration_start', False)
             dtheta_array = []
             dt_array = []
 
