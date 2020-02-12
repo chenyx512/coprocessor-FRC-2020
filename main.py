@@ -103,7 +103,6 @@ def cv_update():
         # TODO check if target is on opposite side (may not need to)
         odom_table.putBoolean('target_found', target_found)
         if not target_found:
-            odom_table.putBoolean('target_found', False)
             return True
 
         if odom_table.getBoolean('field_calibration_start', False):
@@ -122,7 +121,7 @@ def cv_update():
             dt_array.append(dt)
             calibration_cnt_left -= 1
             if calibration_cnt_left == 0:
-                calibrated_dt = np.median(dt_array)
+                calibrated_dt = np.median(dt_array, axis=0)
                 calibrated_dtheta = np.median(dtheta_array)
                 logging.info("end field calibration with"
                              f"dt {calibrated_dt}, dtheta {calibrated_dtheta}")
@@ -144,7 +143,6 @@ def cv_update():
 
         return True
     except Empty:
-        odom_table.putBoolean('target_found', False)
         return False
 
 cv_process_manager = ProcessManager(

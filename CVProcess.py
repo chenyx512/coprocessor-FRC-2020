@@ -60,6 +60,7 @@ class CVProcess(mp.Process):
                         good_contour = None
                         break
                     good_contour = contour
+            
             if good_contour is None:
                 self.putFrame('frame', frame)
                 self.debug('no good contour')
