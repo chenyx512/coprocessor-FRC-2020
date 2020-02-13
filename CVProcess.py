@@ -49,7 +49,11 @@ class CVProcess(mp.Process):
             # find target contour
             good_contour = None
             for contour in contours:
-                if cv2.contourArea(contour) < Constants.MIN_TARGET_AREA:
+                area = cv2.contourArea(contour)
+                if area < Constants.MIN_TARGET_AREA:
+                    continue
+                x, y, w, h = cv2.boundingRect(contour)
+                if area / w / h > Constants.MAX_TARGET2RECT_RATIO:
                     continue
                 epsilon = 0.01 * cv2.arcLength(contour, closed=True)
                 approx = cv2.approxPolyDP(contour, epsilon, closed=True)
@@ -102,17 +106,17 @@ class CVProcess(mp.Process):
 
             # transform to WPI robotics convention
             y, z, x = tvec[:, 0] * (-1, -1, 1)
-            target_relative_dir_right = math.atan2(y, x) / math.pi * 180
-            target_t265_azm = frame_yaw + target_relative_dir_right
+            target_relative_dir_left = math.atan2(y, x) / math.pi * 180
+            target_t265_azm = frame_yaw + target_relative_dir_left
             field_theta = math.atan2(field_y, field_x) / math.pi * 180\
-                          - 180 + target_relative_dir_right
+                          - 180 - target_relative_dir_left
             self.debug(f'distance {target_distance:5.2f} '
-                       f'toleft {target_relative_dir_right:5.1f} '
+                       f'toleft {target_relative_dir_left:5.1f} '
                        f'field_theta {field_theta:5.1f} ')
             try:
                 self.target_queue.put_nowait((True,
                                               target_distance,
-                                              target_relative_dir_right,
+                                              target_relative_dir_left,
                                               target_t265_azm,
                                               [field_x, field_y, field_theta]))
                 self.putFrame('frame', frame)

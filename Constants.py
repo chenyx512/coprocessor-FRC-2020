@@ -27,7 +27,8 @@ class Constants:
                           [0.0, 0.25, 2.06],
                           [0.0, -0.25, 2.06],
                           [0.0, -0.5, 2.49]])
-    MIN_TARGET_AREA = 25
+    MIN_TARGET_AREA = 10
+    MAX_TARGET2RECT_RATIO = 0.4
     MAX_TARGET_DISTANCE = 15
     EXTREME_VECTOR = np.array([[-1, -0.3], [-1, 2], [1, 2], [1, -0.3]])
     # TopLeft, ButLeft, ButRight, TopRight

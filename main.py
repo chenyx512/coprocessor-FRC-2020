@@ -67,10 +67,13 @@ def t265_update():
         xyz_rpy_queue.get_nowait()
         xyz_rpy = xyzrpy_value[0:6]
         pose_tracker.update_t265_pose(xyz_rpy[0], xyz_rpy[1], xyz_rpy[5])
-        for v, c in zip(pose_tracker.field_xyt, 'xyt'):
+        field_xyt = pose_tracker.field_xyt
+        for v, c in zip(field_xyt, 'xyt'):
             odom_table.putNumber(f'field_{c}', v)
         for v, c in zip(pose_tracker.robot_xyt, 'xyt'):
             odom_table.putNumber(f'robot_{c}', v)
+        odom_table.putNumber("target_field_theta",
+                             math.degrees(math.atan2(field_xyt[1], field_xyt[0]))-180)
         return True
     except Empty:
         return False
@@ -87,13 +90,14 @@ def cv_update():
     except Empty:
         pass
     try:
-        target_found, target_dis, target_relative_dir_right, \
+        target_found, target_dis, target_relative_dir_left, \
                 target_t265_azm, camera_xyt = target_queue.get_nowait()
         # TODO check if target is on opposite side (may not need to)
         odom_table.putBoolean('target_found', target_found)
         if not target_found:
             return True
 
+        pose_tracker.update_CV_in_field(*camera_xyt)
         if odom_table.getBoolean('field_calibration_start', False):
             ret = pose_tracker.calibrate()
             logging.info(("GOOD" if ret else "BAD") + " field calibration")
@@ -102,10 +106,10 @@ def cv_update():
 
         for i, c in enumerate('xyt'):
             odom_table.putNumber(f'camera_field_{c}', camera_xyt[i])
-        odom_table.putNumber('target_t265_azm', target_t265_azm)
+        odom_table.putNumber('target_robot_theta', target_t265_azm)
         odom_table.putNumber('target_dis', target_dis)
-        odom_table.putNumber('target_relative_dir_right',
-                             target_relative_dir_right)
+        odom_table.putNumber('target_relative_dir_left',
+                             target_relative_dir_left)
 
         if odom_table.getBoolean('field_calibration_good', False):
             odom_table.putNumber('error_xy', pose_tracker.calibration_error_x)

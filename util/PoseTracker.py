@@ -3,10 +3,10 @@ import math as m
 from queue import Queue, Full
 import logging
 
-T265_X = np.array([[1], [1]])
+T265_X = np.array([[-0.03], [0.15]])
 T265_THETA = 90
-CV_X = np.array([[1], [1]])
-CV_THETA = 90
+CV_X = np.array([[-0.35], [-0.02]])
+CV_THETA = 180
 QUEUE_MAX_SIZE = 4
 
 
@@ -41,6 +41,7 @@ class PoseTracker:
         x_CV_in_field = np.array([[x], [y]])
         x_robot_in_field = x_CV_in_field - np.matmul(_rot_mat(theta + CV_THETA),
                                                      -CV_X)
+        # self.logger.info(f"x {x_robot_in_field} theta {theta}")
         theta_robot_in_field = theta - CV_THETA
         self.calibration_error_x = np.linalg.norm(x_robot_in_field - self.x_field)
         self.calibration_error_theta = m.fabs(self.theta_field - theta_robot_in_field)
@@ -48,27 +49,27 @@ class PoseTracker:
         dtheta_r2f = theta_robot_in_field - self.theta_robot
         _put_and_rotate(dtheta_r2f, self.dtheta_r2f_q)
         dx_r2f = x_robot_in_field - \
-                np.matmul(_rot_mat(dtheta_r2f), x_robot_in_field)
+                np.matmul(_rot_mat(dtheta_r2f), self.x_robot)
         _put_and_rotate(dx_r2f, self.dx_r2f_q)
 
     def calibrate(self):
-        if not self.dx_r2f_q.qsize() == self.dtheta_r2f_q == QUEUE_MAX_SIZE:
+        if not self.dx_r2f_q.qsize() == self.dtheta_r2f_q.qsize() == QUEUE_MAX_SIZE:
             self.logger.warning("fail to calibrate because queue not full")
             return False
         self.dtheta_r2f = np.median(_dump_queue_to_list(self.dtheta_r2f_q))
-        self.dx_r2f = np.median(_dump_queue_to_list(self.dx_r2f_q))
+        self.dx_r2f = np.median(_dump_queue_to_list(self.dx_r2f_q), axis=0)
         return True
 
     @property
     def field_xyt(self):
-        return self.x_field.tolist() + [self.theta_field]
+        return self.x_field.flatten().tolist() + [self.theta_field % 360]
 
     @property
     def robot_xyt(self):
-        return self.x_robot.tolist() + [self.theta_robot]
+        return self.x_robot.flatten().tolist() + [self.theta_robot % 360]
 
 
-def _put_and_rotate(self, element, queue):
+def _put_and_rotate(element, queue):
     try:
         queue.put_nowait(element)
     except Full:
@@ -76,7 +77,7 @@ def _put_and_rotate(self, element, queue):
         queue.put_nowait(element)
 
 
-def _dump_queue_to_list(self, queue):
+def _dump_queue_to_list(queue):
     values = []
     while not queue.empty():
         values.append(queue.get_nowait())
