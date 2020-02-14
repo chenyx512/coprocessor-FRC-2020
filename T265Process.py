@@ -12,7 +12,6 @@ class T265Process(mp.Process):
         self.xyz_rpy_value = xyz_rpy_value
         self.encoder_v_queue = encoder_v_queue
         self.logger = logging.getLogger(__name__)
-        self.daemon = True
 
     def process_method(self):
         pipe = rs.pipeline()

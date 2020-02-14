@@ -60,6 +60,10 @@ class PoseTracker:
         self.dx_r2f = np.median(_dump_queue_to_list(self.dx_r2f_q), axis=0)
         return True
 
+    def clear_calibration(self):
+        _dump_queue_to_list(self.dx_r2f_q)
+        _dump_queue_to_list(self.dtheta_r2f_q)
+
     @property
     def field_xyt(self):
         return self.x_field.flatten().tolist() + [self.theta_field % 360]

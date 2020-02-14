@@ -7,6 +7,7 @@ from networktables import NetworkTables
 from queue import Full, Empty
 import yaml
 import numpy as np
+import numbers
 import math
 
 from T265Process import T265Process
@@ -15,7 +16,7 @@ from Constants import Constants
 from ProcessManager import ProcessManager
 from util.transformation import getRotationMatrix2d
 from util.CameraServerWrapper import CameraServerWrapper
-from util.PoseTracker import PoseTracker
+import util.PoseTracker as PoseTracker
 
 
 # logging setup
@@ -30,7 +31,8 @@ logging.config.dictConfig(logging_config)
 # shared
 encoder_v_queue = mp.Queue(1)
 xyz_rpy_queue = mp.Queue(1)
-frame_queue = mp.Queue(1)
+frame_queue = mp.Queue(10)
+ntable_queue = mp.Queue(100)
 xyzrpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
 
@@ -59,7 +61,7 @@ is_CV_connected = False
 last_CV_connect_time = time.time()
 slave_handshake_cnt = 0
 
-pose_tracker = PoseTracker()
+pose_tracker = PoseTracker.PoseTracker()
 
 # processes
 def t265_update():
@@ -67,13 +69,10 @@ def t265_update():
         xyz_rpy_queue.get_nowait()
         xyz_rpy = xyzrpy_value[0:6]
         pose_tracker.update_t265_pose(xyz_rpy[0], xyz_rpy[1], xyz_rpy[5])
-        field_xyt = pose_tracker.field_xyt
-        for v, c in zip(field_xyt, 'xyt'):
+        for v, c in zip(pose_tracker.field_xyt, 'xyt'):
             odom_table.putNumber(f'field_{c}', v)
         for v, c in zip(pose_tracker.robot_xyt, 'xyt'):
             odom_table.putNumber(f'robot_{c}', v)
-        odom_table.putNumber("target_field_theta",
-                             math.degrees(math.atan2(field_xyt[1], field_xyt[0]))-180)
         return True
     except Empty:
         return False
@@ -84,17 +83,18 @@ t265_process_manager = ProcessManager(
 
 def cv_update():
     try:
-        while True:
-            name, frame = frame_queue.get_nowait()
-            camera_server.put_frame(name, frame)
-    except Empty:
-        pass
-    try:
         target_found, target_dis, target_relative_dir_left, \
                 target_t265_azm, camera_xyt = target_queue.get_nowait()
         # TODO check if target is on opposite side (may not need to)
         odom_table.putBoolean('target_found', target_found)
         if not target_found:
+            pose_tracker.clear_calibration()
+            field_xyt = pose_tracker.field_xyt
+            odom_table.putNumber(
+                "target_field_theta",
+                math.degrees(math.atan2(field_xyt[1], field_xyt[0])) - 180 - PoseTracker.CV_THETA
+            )
+            odom_table.putNumber('target_dis', math.hypot(*field_xyt[0:2]))
             return True
 
         pose_tracker.update_CV_in_field(*camera_xyt)
@@ -106,7 +106,7 @@ def cv_update():
 
         for i, c in enumerate('xyt'):
             odom_table.putNumber(f'camera_field_{c}', camera_xyt[i])
-        odom_table.putNumber('target_robot_theta', target_t265_azm)
+        odom_table.putNumber('target_field_theta', target_t265_azm + pose_tracker.dtheta_r2f)
         odom_table.putNumber('target_dis', target_dis)
         odom_table.putNumber('target_relative_dir_left',
                              target_relative_dir_left)
@@ -119,7 +119,7 @@ def cv_update():
         return False
 
 cv_process_manager = ProcessManager(
-    lambda: CVProcess(target_queue, xyzrpy_value, frame_queue),
+    lambda: CVProcess(target_queue, xyzrpy_value, frame_queue, ntable_queue),
     cv_update,
 )
 
@@ -135,6 +135,25 @@ while True:
 
     # handshake
     odom_table.putNumber('client_time', time.time())
+
+    # update camera server
+    try:
+        while True:
+            name, frame = frame_queue.get_nowait()
+            camera_server.put_frame(name, frame)
+    except Empty:
+        pass
+
+    # update networktable
+    try:
+        while True:
+            key, value = frame_queue.get_nowait()
+            if isinstance(value, numbers.Number):
+                odom_table.putNumber(key, value)
+            elif type(value) == bool:
+                odom_table.putBoolean(key, value)
+    except Empty:
+        pass
 
     NetworkTables.flush()
     time.sleep(0.01)

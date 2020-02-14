@@ -29,6 +29,7 @@ class ProcessManager:
         self.is_connected = False
         self.last_update_time = time.time()
 
+        self.process.daemon = True
         self.process.start()
 
 
