@@ -3,9 +3,9 @@ import math as m
 from queue import Queue, Full
 import logging
 
-T265_X = np.array([[-0.03], [0.15]])
+T265_X = np.array([[-0.4], [-0.4]])
 T265_THETA = 90
-CV_X = np.array([[-0.35], [-0.02]])
+CV_X = np.array([[-0.4], [-0.02]])
 CV_THETA = 180
 QUEUE_MAX_SIZE = 4
 

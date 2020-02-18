@@ -147,7 +147,7 @@ while True:
     # update networktable
     try:
         while True:
-            key, value = frame_queue.get_nowait()
+            key, value = ntable_queue.get_nowait()
             if isinstance(value, numbers.Number):
                 odom_table.putNumber(key, value)
             elif type(value) == bool:
