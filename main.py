@@ -124,7 +124,7 @@ def cv_update():
         odom_table.putNumber(
             'target_field_theta',
             target_field_theta_smoother.update(
-                target_t265_azm + pose_tracker.dtheta_r2f - PoseTracker.CV_THETA)
+                target_t265_azm + pose_tracker.dtheta_r2f)
         )
         odom_table.putNumber('target_dis',
                              target_dis_smoother.update(target_dis))
