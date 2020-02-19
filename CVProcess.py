@@ -119,7 +119,7 @@ class CVProcess(mp.Process):
             pitch = 180 * ((eul[0, 0] + math.pi / 2) * math.cos(eul[1, 0])) / math.pi
             roll = 180 * ((-(math.pi / 2) - eul[0, 0]) * math.sin(eul[1, 0]) + eul[2, 0]) / math.pi
             for c, v in zip("ypr", [yaw, pitch, roll]):
-                self.putNtable(f'CV/camera_{c}', v)
+                self.putNtable(f'CV/camera_{c}', v % 360)
             # reject target for bad YPR
 
             self.debug(f'distance {target_distance:5.2f} '

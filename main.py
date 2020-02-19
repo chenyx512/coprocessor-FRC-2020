@@ -14,7 +14,7 @@ from T265Process import T265Process
 from CVProcess import CVProcess
 from Constants import Constants
 from ProcessManager import ProcessManager
-from util.transformation import getRotationMatrix2d
+from util.Smoothers import MedianSmoother, MedianAngleSmoother
 from util.CameraServerWrapper import CameraServerWrapper
 import util.PoseTracker as PoseTracker
 
@@ -35,6 +35,11 @@ frame_queue = mp.Queue(10)
 ntable_queue = mp.Queue(100)
 xyzrpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
+
+# target
+last_target_found_time = 0
+target_dis_smoother = MedianSmoother(Constants.TARGET_SMOOTH_NUM)
+target_field_theta_smoother = MedianAngleSmoother(Constants.TARGET_SMOOTH_NUM)
 
 
 def encoder_callback(entry, key, value, is_new):
@@ -82,6 +87,7 @@ t265_process_manager = ProcessManager(
 )
 
 def cv_update():
+    global last_target_found_time
     try:
         target_found, target_dis, target_relative_dir_left, \
                 target_t265_azm, camera_xyt = target_queue.get_nowait()
@@ -89,14 +95,22 @@ def cv_update():
         odom_table.putBoolean('target_found', target_found)
         if not target_found:
             pose_tracker.clear_calibration()
-            field_xyt = pose_tracker.field_xyt
-            odom_table.putNumber(
-                "target_field_theta",
-                math.degrees(math.atan2(field_xyt[1], field_xyt[0])) - 180 - PoseTracker.CV_THETA
-            )
-            odom_table.putNumber('target_dis', math.hypot(*field_xyt[0:2]))
+            if time.time() > last_target_found_time + Constants.HOLD_TARGET_TIME:
+                field_xyt = pose_tracker.field_xyt
+                odom_table.putNumber(
+                    "target_field_theta",
+                    target_field_theta_smoother.update(
+                        math.degrees(math.atan2(field_xyt[1], field_xyt[0]))
+                        - 180 - PoseTracker.CV_THETA
+                    )
+                )
+                odom_table.putNumber(
+                    'target_dis',
+                    target_dis_smoother.update(math.hypot(*field_xyt[0:2]))
+                )
             return True
 
+        last_target_found_time = time.time()
         pose_tracker.update_CV_in_field(*camera_xyt)
         if odom_table.getBoolean('field_calibration_start', False):
             ret = pose_tracker.calibrate()
@@ -106,8 +120,12 @@ def cv_update():
 
         for i, c in enumerate('xyt'):
             odom_table.putNumber(f'camera_field_{c}', camera_xyt[i])
-        odom_table.putNumber('target_field_theta', target_t265_azm + pose_tracker.dtheta_r2f)
-        odom_table.putNumber('target_dis', target_dis)
+        odom_table.putNumber(
+            'target_field_theta',
+            target_field_theta_smoother.update(target_t265_azm + pose_tracker.dtheta_r2f)
+        )
+        odom_table.putNumber('target_dis',
+                             target_dis_smoother.update(target_dis))
         odom_table.putNumber('target_relative_dir_left',
                              target_relative_dir_left)
 
