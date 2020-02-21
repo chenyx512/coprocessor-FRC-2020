@@ -40,13 +40,14 @@ class CVProcess(mp.Process):
             frame_HSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             thresh = cv2.inRange(frame_HSV, Constants.HSV_LOW, Constants.HSV_HIGH)
             # thresh = cv2.blur(thresh, (5, 5)) # may not be necessary
-            self.putFrame('thresh', thresh)
             if cv2.__version__.startswith('4'):
                 contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                         cv2.CHAIN_APPROX_SIMPLE)
             else:
                 _, contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                         cv2.CHAIN_APPROX_SIMPLE)
+            thresh = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+            thresh = cv2.addWeighted(thresh, 0.6, frame, 0.4)
 
             # find target contour
             good_contour = None
@@ -59,7 +60,7 @@ class CVProcess(mp.Process):
                     continue
                 epsilon = 0.01 * cv2.arcLength(contour, closed=True)
                 approx = cv2.approxPolyDP(contour, epsilon, closed=True)
-                cv2.drawContours(frame, [approx], 0, (255, 0, 0), 3)
+                cv2.drawContours(thresh, [approx], 0, (255, 0, 0), 3)
                 if 7 <= len(approx) <= 9:
                     if good_contour is not None:
                         self.logger.warning('two good contours found, break')
@@ -68,7 +69,7 @@ class CVProcess(mp.Process):
                     good_contour = contour
             
             if good_contour is None:
-                self.putFrame('frame', frame)
+                self.putFrame('shoot', thresh)
                 self.debug('no good contour')
                 self.put_no_target()
                 continue
@@ -77,10 +78,10 @@ class CVProcess(mp.Process):
             arg_extreme_points = np.matmul(Constants.EXTREME_VECTOR,
                                            good_contour[:, 0, :].T).argmax(axis=-1)
             extreme_points = np.take(good_contour, arg_extreme_points, axis=0).squeeze()
-            cv2.drawContours(frame, [good_contour], -1, (255, 0, 0))
+            cv2.drawContours(thresh, [good_contour], -1, (255, 0, 0))
             for point in extreme_points:
-                cv2.circle(frame, tuple(point), 4, (0, 0, 255), -1)
-            self.putFrame('frame', frame)
+                cv2.circle(thresh, tuple(point), 4, (0, 0, 255), -1)
+            self.putFrame('shoot', thresh)
 
             # solvePnP
             ret, rvec, tvec = cv2.solvePnP(Constants.TARGET_3D,

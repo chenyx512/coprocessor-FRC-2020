@@ -157,6 +157,7 @@ while True:
     odom_table.putNumber('client_time', time.time())
 
     # update camera server
+    camera_server.set_output(odom_table.getString("video_output", "")) 
     try:
         while True:
             name, frame = frame_queue.get_nowait()
