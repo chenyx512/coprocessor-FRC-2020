@@ -12,6 +12,7 @@ import math
 
 from T265Process import T265Process
 from CVProcess import CVProcess
+from D435Process import D435Process
 from Constants import Constants
 from ProcessManager import ProcessManager
 from util.transformation import getRotationMatrix2d
@@ -35,6 +36,7 @@ frame_queue = mp.Queue(10)
 ntable_queue = mp.Queue(100)
 xyzrpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
+ball_queue = mp.Queue(1)
 
 
 def encoder_callback(entry, key, value, is_new):
@@ -123,6 +125,19 @@ cv_process_manager = ProcessManager(
     cv_update,
 )
 
+
+def ball_update():
+    try:
+        target_found = ball_queue.get_nowait()
+        return True
+    except Empty:
+        return False
+
+ball_process_manager = ProcessManager(
+    lambda: D435Process(frame_queue, ball_queue),
+    ball_update,
+)
+
 # main loop
 while True:
     # get pose
@@ -132,6 +147,9 @@ while True:
     # get CV
     cv_process_manager.update()
     odom_table.putBoolean('target_good', cv_process_manager.is_connected)
+
+    ball_process_manager.update()
+    odom_table.putBoolean('ball_good', ball_process_manager.is_connected)
 
     # handshake
     odom_table.putNumber('client_time', time.time())
