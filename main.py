@@ -14,7 +14,7 @@ from T265Process import T265Process
 from CVProcess import CVProcess
 from Constants import Constants
 from ProcessManager import ProcessManager
-from util.Smoothers import MedianSmoother, MedianAngleSmoother
+from util.Smoothers import Smoother, AngleSmoother
 from util.CameraServerWrapper import CameraServerWrapper
 import util.PoseTracker as PoseTracker
 
@@ -38,8 +38,8 @@ target_queue = mp.Queue(1)
 
 # target
 last_target_found_time = 0
-target_dis_smoother = MedianSmoother(Constants.TARGET_SMOOTH_NUM)
-target_field_theta_smoother = MedianAngleSmoother(Constants.TARGET_SMOOTH_NUM)
+target_dis_smoother = Smoother(Constants.TARGET_SMOOTH_NUM)
+target_field_theta_smoother = AngleSmoother(Constants.TARGET_SMOOTH_NUM)
 
 
 def encoder_callback(entry, key, value, is_new):
@@ -132,8 +132,10 @@ def cv_update():
                              target_relative_dir_left)
 
         if odom_table.getBoolean('field_calibration_good', False):
-            odom_table.putNumber('error_xy', pose_tracker.calibration_error_x)
-            odom_table.putNumber('error_theta', pose_tracker.calibration_error_theta)
+            odom_table.putNumber('error_xy',
+                                 pose_tracker.calibration_error_x.get())
+            odom_table.putNumber('error_theta',
+                                 pose_tracker.calibration_error_theta.get())
         return True
     except Empty:
         return False
