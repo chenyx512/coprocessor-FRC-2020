@@ -47,8 +47,9 @@ def encoder_callback(entry, key, value, is_new):
             logging.warning('encoder_v queue full')
 
 # NTable
-logging.info(f'start networktable client for 3566')
-NetworkTables.startClientTeam(3566)
+logging.info(f'start networktable client for 10.35.66.2')
+NetworkTables.startClient("10.35.66.2")
+# NetworkTables.startClientTeam(3566)
 odom_table = NetworkTables.getTable('odom')
 NetworkTables.getEntry('/odom/encoder_v').addListener(
     encoder_callback,
@@ -82,6 +83,8 @@ t265_process_manager = ProcessManager(
     lambda: T265Process(xyz_rpy_queue, xyzrpy_value, encoder_v_queue),
     t265_update,
 )
+
+time.sleep(5) # must have t265 launch first to work
 
 def cv_update():
     try:
@@ -129,7 +132,8 @@ cv_process_manager = ProcessManager(
 def ball_update():
     try:
         target = ball_queue.get_nowait()
-        odom_table.setDoubleArray("ball", target)
+        if type(target) == list:
+            odom_table.putNumberArray("ball", target)
         return True
     except Empty:
         return False
@@ -175,4 +179,3 @@ while True:
         pass
 
     NetworkTables.flush()
-    time.sleep(0.01)

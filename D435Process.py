@@ -106,7 +106,6 @@ class D435Process(mp.Process):
                         continue
                     (x_2d, y_2d), r = cv2.minEnclosingCircle(contour)
                     if contour_area / (m.pi * r * r) < 0.7:
-                        print("ignore")
                         continue
                     cv2.drawContours(color_image, contours, index, (0, 0, 255), 3)
                     dis = circle_sample(image_3d, x_2d, y_2d, r)
@@ -114,7 +113,8 @@ class D435Process(mp.Process):
                     dis = m.sqrt(dis * dis - HEIGHT * HEIGHT) # to 2d dis
                     angle = m.degrees(m.atan(pt_3d[0] / dis))
                     angle = frame_yaw - angle #to robot theta
-                    target.append((dis, angle))
+                    target.append(dis)
+                    target.append(angle)
                 self.putFrame("intake", color_image)
 
                 try:
