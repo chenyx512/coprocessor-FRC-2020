@@ -19,6 +19,8 @@ class T265Process(mp.Process):
         cfg.enable_stream(rs.stream.pose)
         profile = cfg.resolve(pipe)
         dev = profile.get_device()
+        dev.first_pose_sensor().set_option(rs.option.enable_pose_jumping,
+                                           False)
         tm2 = dev.as_tm2()
         if not tm2:
             raise Exception("t265 not found")

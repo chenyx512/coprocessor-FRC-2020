@@ -18,11 +18,13 @@ class CameraServerWrapper:
     """
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        if not WORKING:
+            self.logger.warning('CameraServer not installed')
+            return
         self.video_server = CameraServer.getInstance(). \
                 putVideo('nano_output', self.HEIGHT, self.WIDTH)
         self.output = ""
-        if not WORKING:
-            self.logger.warning('CameraServer not installed')
+
 
     def set_output(self, name):
         self.output = name
