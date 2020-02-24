@@ -47,7 +47,7 @@ class CVProcess(mp.Process):
                 _, contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                         cv2.CHAIN_APPROX_SIMPLE)
             thresh = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-            thresh = cv2.addWeighted(thresh, 0.6, frame, 0.4)
+            thresh = cv2.addWeighted(thresh, 0.6, frame, 0.4, 0)
 
             # find target contour
             good_contour = None
