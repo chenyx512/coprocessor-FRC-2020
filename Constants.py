@@ -13,9 +13,9 @@ class Constants:
     )
     DISTORTION_COEF = np.array([0.1226279, -0.43199166,  0.00196861,
                                 -0.00344178, -1.21531281])
-    H_MIN = 60
+    H_MIN = 43
     H_MAX = 100
-    S_MIN = 100
+    S_MIN = 24
     S_MAX = 255
     V_MIN = 27
     V_MAX = 255
@@ -27,11 +27,14 @@ class Constants:
                           [0.0, 0.25, 2.06],
                           [0.0, -0.25, 2.06],
                           [0.0, -0.5, 2.49]])
-    MIN_TARGET_AREA = 10
+    MIN_TARGET_AREA = 100
     MAX_TARGET2RECT_RATIO = 0.4
     MAX_TARGET_DISTANCE = 15
     EXTREME_VECTOR = np.array([[-1, -0.3], [-1, 2], [1, 2], [1, -0.3]])
     # TopLeft, ButLeft, ButRight, TopRight
+
+    HOLD_TARGET_TIME = 0.2
+    TARGET_SMOOTH_NUM = 5
 
     # Connection, these constants may be changed for different process
     DISCONNECT_DURATION = 1.0 # sec

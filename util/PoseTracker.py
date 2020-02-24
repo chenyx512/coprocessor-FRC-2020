@@ -3,9 +3,9 @@ import math as m
 from queue import Queue, Full
 import logging
 
-T265_X = np.array([[-0.03], [0.15]])
-T265_THETA = 90
-CV_X = np.array([[-0.35], [-0.02]])
+T265_X = np.array([[-0.25], [-0.3]])
+T265_THETA = 265
+CV_X = np.array([[-0.4], [-0.02]])
 CV_THETA = 180
 QUEUE_MAX_SIZE = 4
 
@@ -59,6 +59,10 @@ class PoseTracker:
         self.dtheta_r2f = np.median(_dump_queue_to_list(self.dtheta_r2f_q))
         self.dx_r2f = np.median(_dump_queue_to_list(self.dx_r2f_q), axis=0)
         return True
+
+    def clear_calibration(self):
+        _dump_queue_to_list(self.dx_r2f_q)
+        _dump_queue_to_list(self.dtheta_r2f_q)
 
     @property
     def field_xyt(self):
