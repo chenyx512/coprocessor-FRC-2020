@@ -128,13 +128,14 @@ cv_process_manager = ProcessManager(
 
 def ball_update():
     try:
-        target_found = ball_queue.get_nowait()
+        target = ball_queue.get_nowait()
+        odom_table.setDoubleArray("ball", target)
         return True
     except Empty:
         return False
 
 ball_process_manager = ProcessManager(
-    lambda: D435Process(frame_queue, ball_queue),
+    lambda: D435Process(frame_queue, ball_queue, xyzrpy_value),
     ball_update,
 )
 
