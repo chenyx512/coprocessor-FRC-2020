@@ -38,7 +38,7 @@ class Constants:
 
     # Connection, these constants may be changed for different process
     DISCONNECT_DURATION = 1.0 # sec
-    RESTART_DURATION = 5.0 # sec
+    RESTART_DURATION = 10.0 # sec
 
     DEBUG = False
     MA_MOMENTUM = 0.9
