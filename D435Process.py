@@ -3,7 +3,7 @@ import pyrealsense2 as rs
 import numpy as np
 import numpy.linalg as la
 import cv2
-import time
+from statistics import mean
 import multiprocessing as mp
 from queue import Full
 import logging
@@ -103,12 +103,13 @@ class D435Process(mp.Process):
 
                 ball_dis = 1e9
                 ball_angle = 0
+                best_score = 1e9
                 for index, contour in enumerate(contours):
                     contour_area = cv2.contourArea(contour)
                     if contour_area < 100:
                         continue
                     (x_2d, y_2d), r = cv2.minEnclosingCircle(contour)
-                    if contour_area / (m.pi * r * r) < 0.6:
+                    if contour_area / (m.pi * r * r) < 0.55:
                         continue
                     dis = circle_sample(image_3d, x_2d, y_2d, r)
                     if dis < MIN_DIS:
@@ -119,25 +120,31 @@ class D435Process(mp.Process):
                     angle = m.degrees(m.atan(pt_3d[0] / dis))
                     # convert dis to planer dis for output
                     dis_2d = m.sqrt(max(0.1, dis * dis - HEIGHT * HEIGHT))
-                    if dis_2d < ball_dis:
+                    score = dis_2d + abs(angle) / 40
+                    x_2d, y_2d, r = int(x_2d), int(y_2d), int(r)
+                    if score < best_score:
                         ball_dis = dis_2d
                         ball_angle = angle
-
-                    x_2d, y_2d, r = int(x_2d), int(y_2d), int(r)
+                        ball_circle = ((x_2d, y_2d), r)
+                        best_score = score
                     cv2.drawContours(color_image, contours, index, (200, 0, 200), 2)
-                    cv2.circle(color_image, (x_2d, y_2d), r, (0, 0, 255), 2)
+                    cv2.circle(color_image, (x_2d, y_2d), r, (0, 0, 200), 2)
+
                 # thresh = np.stack((thresh, thresh, thresh), axis=-1)
                 # mask = np.stack((mask, mask, mask), axis=-1)
                 # output = cv2.vconcat([thresh, mask, color_image])
                 # show(output)
-                self.putFrame("intake", color_image)
-
+                if ball_dis < 10:
+                    pos, r = ball_circle
+                    print('good')
+                    cv2.circle(color_image, pos, 10, (255, 0, 0), -1)
                 try:
-                    self.ball_queue.put_nowait(ball_dis, -ball_angle,
-                                               frame_yaw - ball_angle)
+                    self.ball_queue.put_nowait((ball_dis, -ball_angle,
+                                                frame_yaw - ball_angle))
                 except Full:
                     pass
-                    # self.logger.warning("ball queue full")
+                # show(color_image)
+                self.putFrame("intake", color_image)
         finally:
             print('stop')
             pipeline_d435.stop()
@@ -159,6 +166,7 @@ class D435Process(mp.Process):
 
 def circle_sample(image_3d, x, y, r):
     adjusted_r = int(1 / m.sqrt(2) * r * 0.8)
+    dis_list = []
     for i in range(100):
         new_x = int(x + random.randint(0, adjusted_r * 2) - adjusted_r)
         new_y = int(y + random.randint(0, adjusted_r * 2) - adjusted_r)
@@ -168,8 +176,10 @@ def circle_sample(image_3d, x, y, r):
         dis = m.sqrt(x_3d * x_3d + y_3d * y_3d + z_3d * z_3d)
         if not (MIN_DIS <= dis <= MAX_DIS):
             continue
-        return dis
-    return 0
+        dis_list.append(dis)
+    if len(dis_list) == 0:
+        return 0
+    return mean(dis_list)
 
 def show(img):
     cv2.imshow('img', img)
