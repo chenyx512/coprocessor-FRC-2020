@@ -3,6 +3,7 @@ import math as m
 from queue import Full, Empty
 import multiprocessing as mp
 import logging
+import time
 
 
 class T265Process(mp.Process):
@@ -39,6 +40,7 @@ class T265Process(mp.Process):
         cnt = 0
         self.logger.info("start pipeline")
         pipe.start(cfg)
+        time.sleep(7)
         try:
             while True:
                 # get pose

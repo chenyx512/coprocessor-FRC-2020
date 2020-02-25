@@ -89,7 +89,7 @@ t265_process_manager = ProcessManager(
     t265_update,
 )
 
-time.sleep(5) # must have t265 launch first to work
+time.sleep(4) # must have t265 launch first to work
 
 def cv_update():
     global last_target_found_time
