@@ -8,7 +8,7 @@ import numpy as np
 def callback(value):
     pass
 
-D435 = False
+D435 = True
 DEPTH_H = 480
 DEPTH_W = 640
 FPS = 30
@@ -36,8 +36,8 @@ def get_trackbar_values(range_filter):
 
 def main():
     range_filter = 'HSV'
+    setup_trackbars(range_filter)
     if not D435:
-        setup_trackbars(range_filter)
         cap = cv2.VideoCapture(0) # TODO change this for camera
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
         cap.set(cv2.CAP_PROP_EXPOSURE, -9)
