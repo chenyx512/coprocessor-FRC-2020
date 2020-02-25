@@ -5,12 +5,12 @@
 * all coordinate system are converted to WPI format, x+ forward of robot, y+ leftward of robot, righthand rule (0 deg forward, turn left increase theta)
 * the poses of RGB camera and t265 with respect to robot need to be set in PoseTracker
  
-#####status flags:
+##### status flags:
 * `pose_good`: whether t265 is working
 * `target_good`: whether RGB camera working
 * `client_time`: time update indicating that nano is alive and connected
 
-#####localization:
+##### localization:
 * `robot_[xyt]`: the 2d pose with respect to t265's starting pose
 * `field_calibration_start`: set this flag to true if the robot is static and facing the correct target, usually at the start of the game. After recognizing the flag, Nano will set this to false.
 * `field_calibration_good`: whether the field_calibration is done. This should be set to false after Nano disconnects.
@@ -23,6 +23,12 @@
 * `target_dis`: the distance from camera to target in 2d plane.
 * `target_relative_dir_left`: in case t265 disconnects but RGB camera works, this shows how many degrees left the robot should turn to face the target 
 
+##### ball detection
+similar to target detection  
+`ball_found`:   
+`ball_dis`:  
+`ball_to_left`:  
+`ball_field_theta`:
 --------------------------------------
 
 ### manual exposure setting:

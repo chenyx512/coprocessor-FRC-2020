@@ -148,12 +148,21 @@ cv_process_manager = ProcessManager(
     cv_update,
 )
 
-
+last_ball_found_time = time.time()
 def ball_update():
+    global last_ball_found_time
     try:
-        target = ball_queue.get_nowait()
-        if type(target) == list:
-            odom_table.putNumberArray("ball", target)
+        ball_dis, ball_to_left, ball_robot_theta = ball_queue.get_nowait()
+        ball_found = ball_dis < 10
+        if ball_found:
+            odom_table.putBoolean("ball_found", True)
+            odom_table.putNumber("ball_dis", ball_dis)
+            odom_table.putNumber("ball_field_theta", ball_robot_theta
+                                 + pose_tracker.dtheta_r2f)
+            odom_table.putNumber("ball_to_left", ball_to_left)
+            last_ball_found_time = time.time()
+        elif time.time() - last_ball_found_time > Constants.HOLD_TARGET_TIME:
+            odom_table.putNumberArray("ball_found", False)
         return True
     except Empty:
         return False

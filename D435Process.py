@@ -9,23 +9,25 @@ from queue import Full
 import logging
 import random
 
-align_to = rs.stream.color
+align_to = rs.stream.depth
 align = rs.align(align_to)
 
 hole_filler = rs.hole_filling_filter()
 
 MIN_DIS = 0.3
-MAX_DIS = 3.0
+MAX_DIS = 2.5
 DEPTH_H = 240
 DEPTH_W = 424
 FPS = 30
-MAX_TOLERANCE_DIS = 0.015
 
-hMin = 19
-hMax = 37
-sMin = 80
+DIS_RADIUS_PRODUCT_MIN = 15
+DIS_RADIUS_PRODUCT_MAX = 27
+
+hMin = 13
+hMax = 40
+sMin = 40
 sMax = 255
-vMin = 105
+vMin = 90
 vMax = 255
 
 HEIGHT = 15 * 0.0254
@@ -49,7 +51,7 @@ class D435Process(mp.Process):
         normal_computer = cv2.rgbd.RgbdNormals_create(DEPTH_H, DEPTH_W, cv2.CV_32F, K)
         plane_computer = cv2.rgbd.RgbdPlane_create(
             cv2.rgbd.RgbdPlane_RGBD_PLANE_METHOD_DEFAULT,
-            int(DEPTH_W * DEPTH_H / 5000), int(DEPTH_W * DEPTH_H / 10), 0.02,
+            int(DEPTH_W * DEPTH_H / 5000), int(DEPTH_W * DEPTH_H / 15), 0.013,
             0.01, 0, 0 # quadratic error
         )
         depth_sensor = profile_d435.get_device().first_depth_sensor()
@@ -74,10 +76,6 @@ class D435Process(mp.Process):
                     raise Exception(
                         "depth_frame and/or color_frame unavailable")
                 color_image = np.asanyarray(color_frame.get_data())
-                try:
-                    self.ball_queue.put_nowait(False)
-                except Full:
-                    self.logger.warning('target_queue full')
 
                 # Convert images to numpy arrays
                 depth_frame = hole_filler.process(depth_frame)
@@ -86,41 +84,60 @@ class D435Process(mp.Process):
                 frame_HSV = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
                 thresh = cv2.inRange(frame_HSV, (hMin, sMin, vMin),
                                                 (hMax, sMax, vMax))
+                out_range_thresh = cv2.inRange(frame_HSV, (0, 0, 0), (0, 0, 0))
+                thresh = cv2.bitwise_or(thresh, out_range_thresh)
                 # show(thresh)
                 image_3d = cv2.rgbd.depthTo3d(depth_image, K)
                 normal = normal_computer.apply(image_3d)
                 plane_labels, plane_coeffs = plane_computer.apply(image_3d, normal)
                 dis_to_cam = la.norm(image_3d, axis=-1)
-                mask = ~(dis_to_cam > MAX_DIS) * ~(dis_to_cam < MIN_DIS) * \
+                mask = (dis_to_cam < MAX_DIS) * (dis_to_cam > MIN_DIS) * \
                        (plane_labels == 255)
                 mask = mask.astype(np.uint8) * thresh
-                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5,5),np.uint8))
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3,3),np.uint8))
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+                # show(mask)
 
                 contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                                cv2.CHAIN_APPROX_SIMPLE)
 
-                target = []
+                ball_dis = 1e9
+                ball_angle = 0
                 for index, contour in enumerate(contours):
                     contour_area = cv2.contourArea(contour)
                     if contour_area < 100:
                         continue
                     (x_2d, y_2d), r = cv2.minEnclosingCircle(contour)
-                    if contour_area / (m.pi * r * r) < 0.7:
+                    if contour_area / (m.pi * r * r) < 0.6:
                         continue
-                    cv2.drawContours(color_image, contours, index, (0, 0, 255), 3)
                     dis = circle_sample(image_3d, x_2d, y_2d, r)
+                    if dis < MIN_DIS:
+                        continue
+                    if not DIS_RADIUS_PRODUCT_MIN < dis * r < DIS_RADIUS_PRODUCT_MAX:
+                        continue
                     pt_3d = K_inv @ [x_2d, y_2d, 1] * dis
-                    dis = m.sqrt(dis * dis - HEIGHT * HEIGHT) # to 2d dis
                     angle = m.degrees(m.atan(pt_3d[0] / dis))
-                    angle = frame_yaw - angle #to robot theta
-                    target.append(dis)
-                    target.append(angle)
+                    # convert dis to planer dis for output
+                    dis_2d = m.sqrt(max(0.1, dis * dis - HEIGHT * HEIGHT))
+                    if dis_2d < ball_dis:
+                        ball_dis = dis_2d
+                        ball_angle = angle
+
+                    x_2d, y_2d, r = int(x_2d), int(y_2d), int(r)
+                    cv2.drawContours(color_image, contours, index, (200, 0, 200), 2)
+                    cv2.circle(color_image, (x_2d, y_2d), r, (0, 0, 255), 2)
+                # thresh = np.stack((thresh, thresh, thresh), axis=-1)
+                # mask = np.stack((mask, mask, mask), axis=-1)
+                # output = cv2.vconcat([thresh, mask, color_image])
+                # show(output)
                 self.putFrame("intake", color_image)
 
                 try:
-                    self.ball_queue.put_nowait(target)
+                    self.ball_queue.put_nowait(ball_dis, -ball_angle,
+                                               frame_yaw - ball_angle)
                 except Full:
-                    self.logger.warning("ball queue full")
+                    pass
+                    # self.logger.warning("ball queue full")
         finally:
             print('stop')
             pipeline_d435.stop()
@@ -142,7 +159,7 @@ class D435Process(mp.Process):
 
 def circle_sample(image_3d, x, y, r):
     adjusted_r = int(1 / m.sqrt(2) * r * 0.8)
-    while True:
+    for i in range(100):
         new_x = int(x + random.randint(0, adjusted_r * 2) - adjusted_r)
         new_y = int(y + random.randint(0, adjusted_r * 2) - adjusted_r)
         if not (0 <= new_x < DEPTH_W and 0 <= new_y < DEPTH_H):
@@ -152,6 +169,7 @@ def circle_sample(image_3d, x, y, r):
         if not (MIN_DIS <= dis <= MAX_DIS):
             continue
         return dis
+    return 0
 
 def show(img):
     cv2.imshow('img', img)
