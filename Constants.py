@@ -13,11 +13,11 @@ class Constants:
     )
     DISTORTION_COEF = np.array([0.1226279, -0.43199166,  0.00196861,
                                 -0.00344178, -1.21531281])
-    H_MIN = 62 
-    H_MAX = 86
+    H_MIN = 57 
+    H_MAX = 84
     S_MIN = 100
     S_MAX = 255
-    V_MIN = 100
+    V_MIN = 24
     V_MAX = 255
     HSV_LOW = (H_MIN, S_MIN, V_MIN)
     HSV_HIGH = (H_MAX, S_MAX, V_MAX)
@@ -27,9 +27,9 @@ class Constants:
                           [0.0, 0.25, 2.06],
                           [0.0, -0.25, 2.06],
                           [0.0, -0.5, 2.49]])
-    MIN_TARGET_AREA = 100
+    MIN_TARGET_AREA = 150
     MAX_TARGET2RECT_RATIO = 0.4
-    MAX_TARGET_DISTANCE = 15
+    MAX_TARGET_DISTANCE = 10
     EXTREME_VECTOR = np.array([[-1, -0.3], [-1, 2], [1, 2], [1, -0.3]])
     # TopLeft, ButLeft, ButRight, TopRight
 
