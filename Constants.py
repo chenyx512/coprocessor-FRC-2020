@@ -13,11 +13,11 @@ class Constants:
     )
     DISTORTION_COEF = np.array([0.1226279, -0.43199166,  0.00196861,
                                 -0.00344178, -1.21531281])
-    H_MIN = 43
-    H_MAX = 100
-    S_MIN = 24
+    H_MIN = 62 
+    H_MAX = 86
+    S_MIN = 100
     S_MAX = 255
-    V_MIN = 27
+    V_MIN = 100
     V_MAX = 255
     HSV_LOW = (H_MIN, S_MIN, V_MIN)
     HSV_HIGH = (H_MAX, S_MAX, V_MAX)
@@ -38,7 +38,7 @@ class Constants:
 
     # Connection, these constants may be changed for different process
     DISCONNECT_DURATION = 1.0 # sec
-    RESTART_DURATION = 5.0 # sec
+    RESTART_DURATION = 10.0 # sec
 
     DEBUG = False
     MA_MOMENTUM = 0.9

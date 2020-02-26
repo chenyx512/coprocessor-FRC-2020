@@ -3,6 +3,7 @@ import math as m
 from queue import Full, Empty
 import multiprocessing as mp
 import logging
+import time
 
 
 class T265Process(mp.Process):
@@ -19,6 +20,8 @@ class T265Process(mp.Process):
         cfg.enable_stream(rs.stream.pose)
         profile = cfg.resolve(pipe)
         dev = profile.get_device()
+        dev.first_pose_sensor().set_option(rs.option.enable_pose_jumping,
+                                           False)
         tm2 = dev.as_tm2()
         if not tm2:
             raise Exception("t265 not found")
@@ -37,6 +40,7 @@ class T265Process(mp.Process):
         cnt = 0
         self.logger.info("start pipeline")
         pipe.start(cfg)
+        time.sleep(7)
         try:
             while True:
                 # get pose

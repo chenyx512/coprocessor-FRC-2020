@@ -12,6 +12,7 @@ import math
 
 from T265Process import T265Process
 from CVProcess import CVProcess
+from D435Process import D435Process
 from Constants import Constants
 from ProcessManager import ProcessManager
 from util.Smoothers import MedianSmoother, MedianAngleSmoother
@@ -35,6 +36,7 @@ frame_queue = mp.Queue(10)
 ntable_queue = mp.Queue(100)
 xyzrpy_value = mp.Array('f', 6)
 target_queue = mp.Queue(1)
+ball_queue = mp.Queue(1)
 
 # target
 last_target_found_time = 0
@@ -50,8 +52,9 @@ def encoder_callback(entry, key, value, is_new):
             logging.warning('encoder_v queue full')
 
 # NTable
-logging.info(f'start networktable client for 3566')
-NetworkTables.startClientTeam(3566)
+logging.info(f'start networktable client for 10.35.66.2')
+NetworkTables.startClient("10.35.66.2")
+# NetworkTables.startClientTeam(3566)
 odom_table = NetworkTables.getTable('odom')
 NetworkTables.getEntry('/odom/encoder_v').addListener(
     encoder_callback,
@@ -85,6 +88,8 @@ t265_process_manager = ProcessManager(
     lambda: T265Process(xyz_rpy_queue, xyzrpy_value, encoder_v_queue),
     t265_update,
 )
+
+time.sleep(4) # must have t265 launch first to work
 
 def cv_update():
     global last_target_found_time
@@ -143,6 +148,30 @@ cv_process_manager = ProcessManager(
     cv_update,
 )
 
+last_ball_found_time = time.time()
+def ball_update():
+    global last_ball_found_time
+    try:
+        ball_dis, ball_to_left, ball_robot_theta = ball_queue.get_nowait()
+        ball_found = ball_dis < 10
+        if ball_found:
+            odom_table.putBoolean("ball_found", True)
+            odom_table.putNumber("ball_dis", ball_dis)
+            odom_table.putNumber("ball_field_theta", ball_robot_theta
+                                 + pose_tracker.dtheta_r2f)
+            odom_table.putNumber("ball_to_left", ball_to_left)
+            last_ball_found_time = time.time()
+        elif time.time() - last_ball_found_time > Constants.HOLD_TARGET_TIME:
+            odom_table.putBoolean("ball_found", False)
+        return True
+    except Empty:
+        return False
+
+ball_process_manager = ProcessManager(
+    lambda: D435Process(frame_queue, ball_queue, xyzrpy_value),
+    ball_update,
+)
+
 # main loop
 while True:
     # get pose
@@ -152,6 +181,9 @@ while True:
     # get CV
     cv_process_manager.update()
     odom_table.putBoolean('target_good', cv_process_manager.is_connected)
+
+    ball_process_manager.update()
+    odom_table.putBoolean('ball_good', ball_process_manager.is_connected)
 
     # handshake
     odom_table.putNumber('client_time', time.time())
@@ -177,4 +209,3 @@ while True:
         pass
 
     NetworkTables.flush()
-    time.sleep(0.01)
