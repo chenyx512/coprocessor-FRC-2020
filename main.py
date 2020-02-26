@@ -162,7 +162,7 @@ def ball_update():
             odom_table.putNumber("ball_to_left", ball_to_left)
             last_ball_found_time = time.time()
         elif time.time() - last_ball_found_time > Constants.HOLD_TARGET_TIME:
-            odom_table.putNumberArray("ball_found", False)
+            odom_table.putBoolean("ball_found", False)
         return True
     except Empty:
         return False
