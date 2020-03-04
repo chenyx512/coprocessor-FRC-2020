@@ -89,7 +89,6 @@ class CVProcess(mp.Process):
                 if target_distance > Constants.MAX_TARGET_DISTANCE \
                         or target_distance < Constants.MIN_TARGET_DISTANCE:
                     continue
-                # print(h * target_distance)
 
                 # camera orientation in world coord
                 pitch, roll, yaw = rotationMatrixToEulerAngles(rotation_matrix.T)
@@ -99,7 +98,8 @@ class CVProcess(mp.Process):
                         Constants.MAX_ALLOWABLE_YPR_DIFF\
                         or abs((roll - Constants.ROLL + 180) % 360 - 180) > \
                         Constants.MAX_ALLOWABLE_YPR_DIFF:
-                    print("angle error")
+                    self.logger.warning(f"orientation error with yaw {yaw:.2f}"
+                                        f" pitch {pitch:.2f} roll {roll:.2f}")
                     continue
 
                 for c, v in zip("xyztpr", [field_x, field_y, field_z, yaw, pitch, roll]):
@@ -122,8 +122,7 @@ class CVProcess(mp.Process):
                     cv2.circle(thresh, tuple(point), 4, (0, 0, 255), -1)
                 if target is not None:
                     target = None
-                    print(f'double target dis {target_distance}')
-                    # return
+                    self.logger.warning("double target")
                     break
                 target = (True,
                           target_distance,
@@ -139,7 +138,7 @@ class CVProcess(mp.Process):
             except Full:
                 self.logger.warning('target_queue full')
 
-            show(thresh)
+            # show(thresh)
             self.putFrame('shoot', thresh)
 
     def debug(self, msg):
