@@ -8,8 +8,9 @@ import multiprocessing as mp
 from queue import Full
 import logging
 import random
+from util.SphereFitting import *
 
-align_to = rs.stream.depth
+align_to = rs.stream.color
 align = rs.align(align_to)
 
 hole_filler = rs.hole_filling_filter()
@@ -20,8 +21,8 @@ DEPTH_H = 240
 DEPTH_W = 424
 FPS = 30
 
-DIS_RADIUS_PRODUCT_MIN = 15
-DIS_RADIUS_PRODUCT_MAX = 27
+DIS_RADIUS_PRODUCT_MIN = 22
+DIS_RADIUS_PRODUCT_MAX = 40
 
 hMin = 13
 hMax = 40
@@ -30,7 +31,7 @@ sMax = 255
 vMin = 90
 vMax = 255
 
-HEIGHT = 15 * 0.0254
+HEIGHT = 17 * 0.0254
 
 class D435Process(mp.Process):
     def __init__(self, frame_queue, ball_queue, xyzrpy_value):
@@ -84,16 +85,16 @@ class D435Process(mp.Process):
                 frame_HSV = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
                 thresh = cv2.inRange(frame_HSV, (hMin, sMin, vMin),
                                                 (hMax, sMax, vMax))
-                out_range_thresh = cv2.inRange(frame_HSV, (0, 0, 0), (0, 0, 0))
-                thresh = cv2.bitwise_or(thresh, out_range_thresh)
                 # show(thresh)
+
                 image_3d = cv2.rgbd.depthTo3d(depth_image, K)
+                unknown_mask = np.isnan(image_3d[..., -1])
                 normal = normal_computer.apply(image_3d)
                 plane_labels, plane_coeffs = plane_computer.apply(image_3d, normal)
                 dis_to_cam = la.norm(image_3d, axis=-1)
-                mask = (dis_to_cam < MAX_DIS) * (dis_to_cam > MIN_DIS) * \
-                       (plane_labels == 255)
-                mask = mask.astype(np.uint8) * thresh
+                valid_mask = (dis_to_cam < MAX_DIS) * (dis_to_cam > MIN_DIS) * \
+                             (plane_labels == 255)
+                mask = np.logical_or(valid_mask, unknown_mask).astype(np.uint8) * thresh
                 mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3,3),np.uint8))
                 mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
                 # show(mask)
@@ -115,13 +116,28 @@ class D435Process(mp.Process):
                     if dis < MIN_DIS:
                         continue
                     if not DIS_RADIUS_PRODUCT_MIN < dis * r < DIS_RADIUS_PRODUCT_MAX:
+                        # print(f"raidus distance ratio skip {dis * r:.3f}")
                         continue
+
+                    x_2d, y_2d, r = int(x_2d), int(y_2d), int(r)
+
+                    contour_mask = np.zeros((DEPTH_H, DEPTH_W), dtype=np.uint8)
+                    contour_mask = cv2.circle(contour_mask, (x_2d, y_2d), int(r * 0.9), (255), -1)
+                    contour_mask = (mask==255) * valid_mask * (contour_mask == 255)
+                    points = image_3d[contour_mask]
+                    confidence, sphere = fit_sphere_LSE_RANSAC(points)
+                    sphere_r, center_x, center_y, center_z = sphere
+                    center_dis = (center_x ** 2 + center_y ** 2 + center_z ** 2) ** 0.5
+                    # print(f"{confidence:.2f} {sphere_r:.2f} {dis:.2f} {center_dis:.2f}")
+                    if confidence < 0.4 or sphere_r > 0.3 or sphere_r < 0.05:
+                        # print("skip")
+                        continue
+
                     pt_3d = K_inv @ [x_2d, y_2d, 1] * dis
                     angle = m.degrees(m.atan(pt_3d[0] / dis))
                     # convert dis to planer dis for output
                     dis_2d = m.sqrt(max(0.1, dis * dis - HEIGHT * HEIGHT))
                     score = dis_2d + abs(angle) / 40
-                    x_2d, y_2d, r = int(x_2d), int(y_2d), int(r)
                     if score < best_score:
                         ball_dis = dis_2d
                         ball_angle = angle
@@ -136,7 +152,6 @@ class D435Process(mp.Process):
                 # show(output)
                 if ball_dis < 10:
                     pos, r = ball_circle
-                    print('good')
                     cv2.circle(color_image, pos, 10, (255, 0, 0), -1)
                 try:
                     self.ball_queue.put_nowait((ball_dis, -ball_angle,
