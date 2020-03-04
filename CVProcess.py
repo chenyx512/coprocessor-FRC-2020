@@ -58,10 +58,10 @@ class CVProcess(mp.Process):
                 x, y, w, h = cv2.boundingRect(contour)
                 if area / w / h > Constants.MAX_TARGET2RECT_RATIO:
                     continue
-                epsilon = 0.01 * cv2.arcLength(contour, closed=True)
+                epsilon = 0.004 * cv2.arcLength(contour, closed=True)
                 approx = cv2.approxPolyDP(contour, epsilon, closed=True)
                 cv2.drawContours(thresh, [approx], 0, (255, 0, 0), 3)
-                if 7 <= len(approx) <= 9:
+                if 7 <= len(approx):
                     if good_contour is not None:
                         self.logger.warning('two good contours found, break')
                         good_contour = None
@@ -102,8 +102,8 @@ class CVProcess(mp.Process):
 
             target_distance = math.hypot(field_x, field_y)
             # target distance too big means it is wrong
-            if target_distance > Constants.MAX_TARGET_DISTANCE:
-                self.logger.warning(f'target distance {target_distance} too big')
+            if target_distance > Constants.MAX_TARGET_DISTANCE or target_distance < 2.0:
+                self.logger.warning(f'target distance {target_distance} out of range')
                 self.put_no_target()
                 continue
 
