@@ -27,11 +27,16 @@ class Constants:
                           [0.0, 0.25, 2.06],
                           [0.0, -0.25, 2.06],
                           [0.0, -0.5, 2.49]])
-    MIN_TARGET_AREA = 150
-    MAX_TARGET2RECT_RATIO = 0.4
+    MIN_TARGET_AREA = 180
+    MAX_TARGET2RECT_RATIO = 0.25
     MAX_TARGET_DISTANCE = 10
+    MIN_TARGET_DISTANCE = 2
     EXTREME_VECTOR = np.array([[-1, -0.3], [-1, 2], [1, 2], [1, -0.3]])
     # TopLeft, ButLeft, ButRight, TopRight
+
+    PITCH = 18
+    ROLL = 0
+    MAX_ALLOWABLE_YPR_DIFF = 12
 
     HOLD_TARGET_TIME = 0.2
     TARGET_SMOOTH_NUM = 5

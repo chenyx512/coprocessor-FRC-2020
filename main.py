@@ -96,7 +96,6 @@ def cv_update():
     try:
         target_found, target_dis, target_relative_dir_left, \
                 target_t265_azm, camera_xyt = target_queue.get_nowait()
-        # TODO check if target is on opposite side (may not need to)
         if not target_found:
             pose_tracker.clear_calibration()
             if time.time() > last_target_found_time + Constants.HOLD_TARGET_TIME:
